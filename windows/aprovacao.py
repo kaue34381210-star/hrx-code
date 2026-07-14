@@ -68,6 +68,12 @@ MUTANTES = {
     "awk", "nmap", "curl", "wget", "ssh", "scp", "rsync",
 }
 
+# Flags que tornam um git "de leitura" capaz de escrever arquivo ou executar
+# código (defesa contra argv flag smuggling / config injection).
+GIT_FLAGS_SENSIVEIS = re.compile(
+    r"(^|\s)(-c\b|-C\b|--exec-path|--output\b|-O\b|--open-files-in-pager"
+    r"|--ext-diff|--upload-pack|--receive-pack|--exec\b|--pager\b)")
+
 NIVEIS = ("verde", "amarelo", "vermelho")
 
 
@@ -98,6 +104,10 @@ def classificar(comando: str, seguros_extra=()) -> tuple:
 
     # 3) git só-leitura é seguro; o resto do git já foi pego no passo 2
     if exe == "git":
+        # flags que transformam um git "de leitura" em escrita/execução:
+        # config injection (-c), saída em arquivo, diff/pager externos, etc.
+        if GIT_FLAGS_SENSIVEIS.search(c):
+            return ("amarelo", "git com flag sensível")
         sub = (c.split()[1].lower() if len(c.split()) > 1 else "")
         if sub in {"status", "diff", "log", "show", "branch", "remote",
                    "fetch", "rev-parse", "describe", "blame", "ls-files",

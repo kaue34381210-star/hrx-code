@@ -68,6 +68,10 @@ def git(args: str = "") -> str:
         partes = shlex.split(args)
     except ValueError as e:
         return f"ERRO: argumentos git inválidos: {e}"
+    if partes and partes[0].startswith("-"):
+        return ("ERRO: opções globais do git (ex: -c, -C, --exec-path) não são "
+                "permitidas antes do subcomando (vetor de injeção). "
+                "Use a forma 'git <subcomando> ...'.")
     if not os.path.isdir(os.path.join(config.REPO, ".git")):
         return (f"ERRO: {config.REPO} não é um repositório git "
                 f"(rode o jarvis dentro de um projeto, ou use 'init').")

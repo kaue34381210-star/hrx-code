@@ -18,6 +18,9 @@ CASOS = [
     ("cp a.txt b.txt", "amarelo"),
     ("git commit -m 'x'", "amarelo"),
     ("git push origin main", "amarelo"),
+    ("git log --output=/tmp/x", "amarelo"),   # flag smuggling → não pode ser 🟢
+    ("git -c core.pager=!sh log", "amarelo"),  # config injection
+    ("git diff --ext-diff", "amarelo"),        # diff externo
     ("pip install requests", "amarelo"),
     ("npm install", "amarelo"),
     ("sed -i 's/a/b/' f.txt", "amarelo"),
