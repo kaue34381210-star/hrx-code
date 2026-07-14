@@ -41,6 +41,9 @@ MAX_ITER = 10         # trava anti-loop do ReAct
 WORKSPACE = os.environ.get("AGENTE_WORKSPACE", os.path.join(BASE, "workspace"))
 DADOS = os.environ.get("AGENTE_DADOS", os.path.join(BASE, "dados"))
 
+# --- Git: opera no diretório de onde o jarvis foi chamado (fora da sandbox) ---
+REPO = os.environ.get("AGENTE_REPO", os.getcwd())
+
 # --- Segurança: aprovação inteligente (🟢🟡🔴) em aprovacao.py ---
 # Não é mais uma whitelist que bloqueia: estes executáveis são tratados
 # como SEMPRE 🟢 seguros (rodam sem pedir confirmação), somados aos padrões

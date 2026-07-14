@@ -1,6 +1,8 @@
-"""Ferramentas do agente. Tudo restrito a WORKSPACE/ e DADOS/."""
+"""Ferramentas do agente. Arquivos restritos a WORKSPACE/ e DADOS/;
+o git opera no repositório do diretório atual (config.REPO)."""
 import os
 import glob
+import shlex
 import subprocess
 
 import config
@@ -55,6 +57,27 @@ def rodar_comando(comando: str) -> str:
                            text=True, timeout=config.TIMEOUT_COMANDO)
     except subprocess.TimeoutExpired:
         return f"ERRO: comando estourou {config.TIMEOUT_COMANDO}s"
+    saida = (r.stdout + r.stderr).strip()
+    return saida[:8000] if saida else f"(sem saída, código {r.returncode})"
+
+
+def git(args: str = "") -> str:
+    """Roda `git <args>` no repositório atual (config.REPO). A liberação por
+    risco (🟢🟡🔴) acontece na camada de aprovação (agente.py)."""
+    try:
+        partes = shlex.split(args)
+    except ValueError as e:
+        return f"ERRO: argumentos git inválidos: {e}"
+    if not os.path.isdir(os.path.join(config.REPO, ".git")):
+        return (f"ERRO: {config.REPO} não é um repositório git "
+                f"(rode o jarvis dentro de um projeto, ou use 'init').")
+    try:
+        r = subprocess.run(["git", *partes], cwd=config.REPO, capture_output=True,
+                           text=True, timeout=config.TIMEOUT_COMANDO)
+    except FileNotFoundError:
+        return "ERRO: git não está instalado."
+    except subprocess.TimeoutExpired:
+        return f"ERRO: git estourou {config.TIMEOUT_COMANDO}s"
     saida = (r.stdout + r.stderr).strip()
     return saida[:8000] if saida else f"(sem saída, código {r.returncode})"
 
@@ -190,6 +213,7 @@ REGISTRO = {
     "criar_planilha": criar_planilha,
     "criar_pdf": criar_pdf,
     "rodar_comando": rodar_comando,
+    "git": git,
     "buscar_docs": buscar_docs,
 }
 

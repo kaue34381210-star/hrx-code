@@ -25,7 +25,12 @@ Ferramentas:
 - criar_planilha(nome, dados, cabecalho)  cria Excel .xlsx; dados = lista de linhas (listas) ou de dicionários
 - criar_pdf(nome, titulo, conteudo, tabela)  cria PDF; conteudo = texto/lista de parágrafos; tabela = lista de linhas (1ª = cabeçalho)
 - rodar_comando(comando)        executa comando no shell do sistema
+- git(args)                     roda git no projeto atual, ex: git("status"), git("commit -m 'msg'")
 - buscar_docs(consulta)         busca nos documentos do usuário
+
+GIT: use a ferramenta git para versionamento (status, diff, log, branch, add,
+commit, push...). Ela age no repositório do diretório atual do usuário. Antes de
+commitar, veja o que mudou (status/diff) e escreva uma mensagem descritiva.
 
 APROVAÇÃO: os comandos passam por um filtro de risco (🟢 seguro roda direto,
 🟡 pede confirmação, 🔴 exige 'sim' explícito). Se o usuário RECUSAR um comando,
@@ -123,6 +128,14 @@ def _fmt_args(args: dict) -> str:
     return ", ".join(f"{k}={str(v)[:40]!r}" for k, v in (args or {}).items())
 
 
+# Ferramentas que passam pelo filtro de risco 🟢🟡🔴, e como montar a string
+# de comando que será classificada a partir dos args.
+_COMANDO_DE_FERRAMENTA = {
+    "rodar_comando": lambda a: str(a.get("comando", "")),
+    "git": lambda a: ("git " + str(a.get("args", ""))).strip(),
+}
+
+
 def _perguntar(prompt: str) -> str:
     """Lê confirmação do usuário. Sem terminal interativo → trata como recusa."""
     try:
@@ -173,8 +186,9 @@ def rodar(pool: PoolChaves, pergunta: str) -> str:
             return texto
         args = acao.get("args", {})
         console.print(f"  [grey50]⚙ {nome}([/grey50][grey62]{_fmt_args(args)}[/grey62][grey50])[/grey50]")
-        if nome == "rodar_comando":
-            permitido, bloqueio = _aprovar_comando(str(args.get("comando", "")))
+        extrair_cmd = _COMANDO_DE_FERRAMENTA.get(nome)
+        if extrair_cmd:
+            permitido, bloqueio = _aprovar_comando(extrair_cmd(args))
             resultado = ferramentas.executar(nome, args) if permitido else bloqueio
         else:
             resultado = ferramentas.executar(nome, args)

@@ -14,8 +14,9 @@ echo "┌─ Instalando JARVIS ────────────────�
 # 1) código
 echo "│ copiando código..."
 mkdir -p "$DEST" "$DEST/workspace" "$DEST/dados" "$CFG" "$BIN"
-cp "$SRC"/config.py "$SRC"/ferramentas.py "$SRC"/gemini.py "$SRC"/agente.py "$DEST"/
+cp "$SRC"/config.py "$SRC"/ferramentas.py "$SRC"/gemini.py "$SRC"/aprovacao.py "$SRC"/agente.py "$DEST"/
 [ -f "$SRC/teste_failover.py" ] && cp "$SRC/teste_failover.py" "$DEST"/
+[ -f "$SRC/teste_aprovacao.py" ] && cp "$SRC/teste_aprovacao.py" "$DEST"/
 [ -f "$SRC/README.md" ] && cp "$SRC/README.md" "$DEST"/
 
 # 2) ambiente Python + dependências
