@@ -1,0 +1,11 @@
+# Modelo do arquivo de chaves.
+# Copie este arquivo para "chaves.txt" e cole suas chaves da API do Gemini,
+# UMA por linha (sem aspas). Linhas começando com # são ignoradas.
+#
+# O arquivo "chaves.txt" está no .gitignore e NUNCA vai para o repositório.
+#
+# Pegue suas chaves grátis em: https://aistudio.google.com/apikey
+#
+# Exemplo:
+# AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+# AIzaSyYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY

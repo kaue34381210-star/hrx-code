@@ -1,0 +1,16 @@
+# === SEGREDOS — NUNCA versionar ===
+chaves.txt
+
+# === Ambiente / artefatos ===
+.venv/
+.buildvenv/
+__pycache__/
+*.pyc
+*.zip
+build_out/
+
+# === Saídas do agente ===
+workspace/*
+!workspace/.gitkeep
+dados/*
+!dados/.gitkeep
