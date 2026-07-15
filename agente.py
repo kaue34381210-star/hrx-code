@@ -531,6 +531,11 @@ def _comando_especial(motor_chamar, pool, pol: permissao.Politica, historico: li
                 console.print(f"  modo atual: [cyan]{atual}[/cyan]  "
                               f"[dim](compacta · completa)[/dim]")
                 return True
+            if len(partes) < 3:
+                console.print("  [red]faltou o modo[/red] — use: "
+                              "[cyan]/memoria modo compacta[/cyan] ou "
+                              "[cyan]/memoria modo completa[/cyan]")
+                return True
             novo = partes[2]
             if novo in ("compacta", "completa"):
                 dados = dict(config._CFG)
