@@ -125,6 +125,9 @@ def chamar(pool: PoolChaves, mensagens: list, on_rotacao=None):
         try:
             r = requests.post(url, params={"key": chave}, json=body, timeout=config.TIMEOUT)
         except requests.RequestException as e:
+            # Erro de rede não significa que a chave está ruim, mas tiramos ela
+            # da frente por alguns segundos para o failover seguir adiante.
+            pool.penalizar(idx, 10)
             ultimo_erro = f"rede: {e}"
             continue
 
