@@ -104,6 +104,18 @@ def banner(rotulo_motor: str, n_memorias: int = 0) -> None:
     console.print(Rule(style="grey30"))
 
 
+REFORCO_LOCAL = """
+MODO LOCAL (modelo pequeno) — REGRA CRÍTICA sobre ferramentas:
+Quando o usuário pede uma AÇÃO concreta (criar planilha, criar PDF, ler/escrever
+arquivo, listar pasta, rodar comando etc.), VOCÊ NÃO PERGUNTA "confirma?" nem
+"quer que eu faça?". Emita IMEDIATAMENTE o JSON da ferramenta no MESMO turno,
+com os args preenchidos com valores razoáveis (se faltar detalhe, use um nome
+de arquivo curto e dados de exemplo — o usuário corrige depois).
+NÃO responda em prosa quando a intenção do usuário é uma AÇÃO — responda com
+UM objeto JSON só: {"pensamento": "...", "ferramenta": "nome", "args": {...}}.
+"""
+
+
 def _montar_system() -> str:
     """SYSTEM + memórias persistentes injetadas no contexto."""
     preferencias = []
@@ -116,16 +128,16 @@ def _montar_system() -> str:
     if getattr(config, "PROJETO", ""):
         preferencias.append(f"- projeto: {config.PROJETO}")
     bloco_pref = "\n".join(preferencias)
-    memorias = ferramentas.carregar_memorias()
+    memorias = ferramentas.memoria_contexto()
     base = SYSTEM
+    if str(getattr(config, "MOTOR", "")).lower() == "local":
+        base += "\n" + REFORCO_LOCAL
     if bloco_pref:
         base += "\n\nPREFERÊNCIAS DO AGENTE:\n" + bloco_pref
-    if not memorias:
+    if not memorias or memorias == "(nenhuma memória guardada)":
         return base
-    linhas = "\n".join(f"- #{m['id']} [{m.get('tipo', 'fato')}] {m['texto']}"
-                       for m in memorias)
     return (base + "\n\nMEMÓRIA (o que você já sabe deste usuário/ambiente — "
-            "use e respeite):\n" + linhas)
+            "use e respeite):\n" + memorias)
 
 
 def extrair_json(texto: str):
@@ -450,6 +462,7 @@ def _comando_especial(motor_chamar, pool, pol: permissao.Politica, historico: li
             "[cyan]/modo[/cyan] [dim]<m>[/dim]   permissões: [dim]blindado · cauteloso · auto[/dim]\n"
             "[cyan]/permissoes[/cyan]  mostra modo e a lista 'sempre permitir'\n"
             "[cyan]/memoria[/cyan]     mostra o que o HRX CODE já lembra\n"
+            "[cyan]/memoria modo[/cyan] mostra/troca o modo da memória\n"
             "[cyan]/novo[/cyan]        começa uma conversa nova (esquece o contexto)\n"
             "[cyan]/limpar[/cyan]      limpa a tela\n"
             "[cyan]/sair[/cyan]        encerra",
@@ -508,6 +521,22 @@ def _comando_especial(motor_chamar, pool, pol: permissao.Politica, historico: li
             title="🔐 permissões", border_style="grey37", padding=(0, 2)))
         return True
     if cmd in ("/memoria", "/memorias"):
+        if partes and len(partes) > 1 and partes[1] == "modo":
+            if len(partes) == 2:
+                atual = getattr(config, "MEMORIA_PROMPT", "compacta")
+                console.print(f"  modo atual: [cyan]{atual}[/cyan]  "
+                              f"[dim](compacta · completa)[/dim]")
+                return True
+            novo = partes[2]
+            if novo in ("compacta", "completa"):
+                dados = dict(config._CFG)
+                dados["memoria_prompt"] = novo
+                config.salvar_motor(dados)
+                importlib.reload(config)
+                console.print(f"  [green]✓[/green] memória no prompt: [cyan]{novo}[/cyan]")
+            else:
+                console.print("  [red]modo inválido[/red] — use: compacta · completa")
+            return True
         console.print(Panel(ferramentas.memoria_listar(),
                             title="🧠 memória", border_style="grey37", padding=(0, 2)))
         return True

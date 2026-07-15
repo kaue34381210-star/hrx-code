@@ -22,6 +22,10 @@ comportamento, os comandos ou a configuração mudarem.
 - Adicionados `/debug` e `/resumo` no terminal.
 - Memória persistente entre sessões com `memoria_salvar`, `memoria_listar` e
   `memoria_esquecer`.
+- Memória no prompt agora é carregada em modo compacto por padrão, com limite
+  de itens e caracteres para gastar menos tokens e permitir sessões maiores.
+- Adicionado `/memoria modo compacta|completa` para alternar a injeção da
+  memória no contexto sem editar arquivo.
 - `README.md` atualizado para refletir comandos e organização do projeto.
 
 ## Regra prática

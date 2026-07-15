@@ -185,6 +185,12 @@ REPO = os.environ.get("AGENTE_REPO", os.getcwd())
 # --- Memória persistente: fatos/decisões que o agente lembra entre sessões ---
 MEMORIA = os.path.join(DADOS, "memoria.json")
 
+# --- Memória no prompt: modo compacto para gastar menos tokens ---
+# "compacta" = injeta só um resumo curto; "completa" = lista tudo.
+MEMORIA_PROMPT = os.environ.get("HRX_MEMORIA_PROMPT", "compacta").strip().lower()
+MEMORIA_PROMPT_MAX_ITENS = int(os.environ.get("HRX_MEMORIA_PROMPT_MAX_ITENS", "8"))
+MEMORIA_PROMPT_MAX_CHARS = int(os.environ.get("HRX_MEMORIA_PROMPT_MAX_CHARS", "900"))
+
 # --- Segurança: aprovação inteligente (🟢🟡🔴) em aprovacao.py ---
 # Não é mais uma whitelist que bloqueia: estes executáveis são tratados
 # como SEMPRE 🟢 seguros (rodam sem pedir confirmação), somados aos padrões

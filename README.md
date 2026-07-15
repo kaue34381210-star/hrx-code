@@ -20,6 +20,8 @@ estilizada. Roda direto do repositório com `python agente.py`.
 - **Motor local:** Qwen2.5 GGUF em `llamafile`, sem chave, cota ou internet.
 - **Motores configuráveis:** escolha o provedor, modelo, URL e chave pelo
   comando `/config`; as credenciais ficam fora do repositório.
+- **Memória compacta no prompt:** carrega só um resumo curto das memórias para
+  economizar tokens e permitir sessões maiores.
 
 ## Instalação
 
@@ -76,6 +78,8 @@ arquivo junto com o README para manter o histórico útil.
 - `NOME` — nome exibido no banner
 - Use `/config` para trocar motor, modelo, URL e chave sem editar arquivos.
 - `COMANDOS_PERMITIDOS` — comandos tratados como seguros pela política
+- `MEMORIA_PROMPT` — modo da memória no prompt (`compacta` por padrão)
+- `/memoria modo compacta|completa` — alterna o modo de carregamento da memória
 
 ## Arquitetura
 

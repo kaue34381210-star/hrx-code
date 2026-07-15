@@ -354,6 +354,50 @@ def carregar_memorias() -> list:
     return _ler_memoria()
 
 
+def _prioridade_memoria(item: dict) -> tuple:
+    """Ordena memórias por utilidade provável no prompt."""
+    tipo = str(item.get("tipo", "fato")).strip().lower()
+    pesos = {
+        "decisao": 0,
+        "projeto": 1,
+        "comando": 2,
+        "preferencia": 3,
+        "fato": 4,
+    }
+    return (pesos.get(tipo, 9), -(int(item.get("id", 0)) or 0))
+
+
+def memoria_contexto(max_itens: int = None, max_chars: int = None) -> str:
+    """Versão compacta da memória para uso no prompt.
+    Mantém poucas memórias e corta textos longos para economizar contexto."""
+    itens = _ler_memoria()
+    if not itens:
+        return "(nenhuma memória guardada)"
+    if str(getattr(config, "MEMORIA_PROMPT", "compacta")).strip().lower() == "completa":
+        return "\n".join(
+            f"- #{m.get('id', '?')} [{m.get('tipo', 'fato')}] "
+            f"{' '.join(str(m.get('texto', '')).strip().split())}"
+            for m in sorted(itens, key=_prioridade_memoria)
+        )
+    limite_itens = max_itens if max_itens is not None else config.MEMORIA_PROMPT_MAX_ITENS
+    limite_chars = max_chars if max_chars is not None else config.MEMORIA_PROMPT_MAX_CHARS
+    ordenadas = sorted(itens, key=_prioridade_memoria)
+    selecionadas = ordenadas[:max(1, int(limite_itens))]
+    linhas = []
+    total = 0
+    for m in selecionadas:
+        texto = str(m.get("texto", "")).strip().replace("\n", " ")
+        texto = " ".join(texto.split())
+        if len(texto) > 120:
+            texto = texto[:117] + "..."
+        linha = f"- #{m.get('id', '?')} [{m.get('tipo', 'fato')}] {texto}"
+        if total + len(linha) > limite_chars and linhas:
+            break
+        linhas.append(linha)
+        total += len(linha)
+    return "\n".join(linhas) if linhas else "(nenhuma memória guardada)"
+
+
 def memoria_salvar(texto: str, tipo: str = "fato") -> str:
     """Guarda um fato/decisão/comando para lembrar em sessões futuras.
     tipo sugerido: fato | comando | decisao | projeto."""
