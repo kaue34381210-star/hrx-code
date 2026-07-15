@@ -5,6 +5,7 @@ Subir o servidor (Qwen2.5-7B):
     ~/agente-ia/bin/llamafile --server --port 8080 -c 4096 -m ~/agente-ia/bin/modelo.gguf
 """
 import requests
+from urllib.parse import urlsplit, urlunsplit
 
 import config
 
@@ -15,7 +16,17 @@ DICA_SERVIDOR = ("~/agente-ia/bin/llamafile --server --port 8080 -c 4096 "
 
 def disponivel() -> bool:
     """True se o servidor local responde (checagem rápida)."""
-    base = config.LOCAL_URL.rsplit("/v1/", 1)[0]
+    partes = urlsplit(config.LOCAL_URL)
+    caminho = partes.path.rstrip("/")
+    if caminho.endswith("/v1/chat/completions"):
+        base_path = caminho[: -len("/v1/chat/completions")]
+    elif caminho.endswith("/chat/completions"):
+        base_path = caminho[: -len("/chat/completions")]
+    elif "/v1/" in caminho:
+        base_path = caminho.rsplit("/v1/", 1)[0]
+    else:
+        base_path = caminho
+    base = urlunsplit((partes.scheme, partes.netloc, base_path.rstrip("/"), "", ""))
     try:
         resposta = requests.get(base + "/health", timeout=3)
         if resposta.ok:
