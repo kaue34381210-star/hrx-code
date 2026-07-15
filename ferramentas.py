@@ -49,14 +49,17 @@ def listar_diretorio(caminho: str = ".") -> str:
 
 
 def rodar_comando(comando: str) -> str:
-    # A liberação por risco (🟢🟡🔴) é feita na camada de aprovação (agente.py).
-    # Aqui só executamos com sandbox de diretório e timeout.
-    partes = comando.strip().split()
-    if not partes:
+    # A barreira real é o gate humano 🟢🟡🔴 em agente.py, que classifica a
+    # STRING completa (incluindo pipes/redirecionamentos). Aqui executamos no
+    # diretório de onde o jarvis foi chamado (config.REPO) — igual ao git — e
+    # via shell, pra que pipe/redirect/glob/&& funcionem de verdade.
+    comando = comando.strip()
+    if not comando:
         return "ERRO: comando vazio"
     try:
-        r = subprocess.run(partes, cwd=config.WORKSPACE, capture_output=True,
-                           text=True, timeout=config.TIMEOUT_COMANDO)
+        r = subprocess.run(comando, cwd=config.REPO, shell=True,
+                           capture_output=True, text=True,
+                           timeout=config.TIMEOUT_COMANDO)
     except subprocess.TimeoutExpired:
         return f"ERRO: comando estourou {config.TIMEOUT_COMANDO}s"
     saida = (r.stdout + r.stderr).strip()
