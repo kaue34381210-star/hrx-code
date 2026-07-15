@@ -357,8 +357,30 @@ def _configurar_motor() -> None:
         return
 
     motor, rotulo = opcoes[escolha]
-    dados = dict(config._CFG)
-    dados["motor"] = motor
+    dados = {
+        "motor": motor,
+    }
+    if motor == "local":
+        dados["local_url"] = getattr(config, "LOCAL_URL", "http://127.0.0.1:8080/v1/chat/completions")
+        dados["local_modelo"] = getattr(config, "MODELO_LOCAL", "Qwen2.5-7B-Instruct")
+    elif motor == "gemini":
+        dados["gemini_modelo"] = getattr(config, "MODELO", "gemini-2.0-flash")
+    elif motor == "openai":
+        atual = config.provedor(motor)
+        dados["openai_url"] = atual.get("url", "https://api.openai.com/v1/chat/completions")
+        dados["openai_modelo"] = atual.get("modelo", "gpt-4o-mini")
+    elif motor == "deepseek":
+        atual = config.provedor(motor)
+        dados["deepseek_url"] = atual.get("url", "https://api.deepseek.com/v1/chat/completions")
+        dados["deepseek_modelo"] = atual.get("modelo", "deepseek-chat")
+    elif motor == "claude":
+        atual = config.provedor(motor)
+        dados["claude_url"] = atual.get("url", "https://api.anthropic.com/v1/messages")
+        dados["claude_modelo"] = atual.get("modelo", "claude-opus-4-8")
+    elif motor == "ollama":
+        atual = config.provedor(motor)
+        dados["ollama_url"] = atual.get("url", "http://127.0.0.1:11434/v1/chat/completions")
+        dados["ollama_modelo"] = atual.get("modelo", "llama3.1")
     campos = {
         "openai": ("openai", "https://api.openai.com/v1/chat/completions", "gpt-4o-mini"),
         "deepseek": ("deepseek", "https://api.deepseek.com/v1/chat/completions", "deepseek-chat"),
@@ -383,6 +405,12 @@ def _configurar_motor() -> None:
     elif motor == "local":
         url = _perguntar(f"  URL [{config.LOCAL_URL}] › ") or config.LOCAL_URL
         modelo = _perguntar(f"  modelo [{config.MODELO_LOCAL}] › ") or config.MODELO_LOCAL
+        if not url.startswith(("http://", "https://")):
+            console.print("  [red]URL inválida[/red] — use http:// ou https://")
+            return
+        if not modelo.strip():
+            console.print("  [red]modelo inválido[/red] — informe um nome de modelo.")
+            return
         dados.update({"local_url": url, "local_modelo": modelo})
     else:
         prefixo, url_padrao, modelo_padrao = campos[motor]
@@ -390,6 +418,12 @@ def _configurar_motor() -> None:
         url = _perguntar(f"  URL [{atual.get('url', url_padrao)}] › ") or atual.get("url", url_padrao)
         modelo = _perguntar(f"  modelo [{atual.get('modelo', modelo_padrao)}] › ") or atual.get("modelo", modelo_padrao)
         chave = "" if motor == "ollama" else _ler_segredo("  chave API (Enter mantém a atual) › ")
+        if not url.startswith(("http://", "https://")):
+            console.print("  [red]URL inválida[/red] — use http:// ou https://")
+            return
+        if not modelo.strip():
+            console.print("  [red]modelo inválido[/red] — informe um nome de modelo.")
+            return
         dados[f"{prefixo}_url"] = url
         dados[f"{prefixo}_modelo"] = modelo
         if chave:
