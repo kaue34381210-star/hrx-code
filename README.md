@@ -28,8 +28,8 @@ Python 3.10+.
 
 ### Passos
 ```bash
-git clone https://github.com/kaue34381210-star/jarvis-agente-terminal.git
-cd jarvis-agente-terminal
+git clone https://github.com/kaue34381210-star/hrx-code.git
+cd hrx-code
 python -m venv .venv && . .venv/bin/activate
 pip install rich requests openpyxl reportlab
 ```
