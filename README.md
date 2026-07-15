@@ -1,9 +1,9 @@
 # 🦾 JARVIS — agente de IA de terminal
 
-Agente de IA que roda no terminal, movido pelo **Qwen local** ou pela **API do
-Gemini**, com **rotação automática de chaves** (failover), **ferramentas** (arquivos,
-planilhas, PDFs) e interface estilizada. Instalável como comando global
-`jarvis` no Linux e no Windows.
+Agente de IA de terminal com motores **Gemini**, **ChatGPT/OpenAI**,
+**DeepSeek**, **Claude**, **Ollama** e **Qwen local**. Tem rotação automática
+das chaves Gemini, ferramentas para código e documentos, além de uma interface
+estilizada. Instalável como comando global `jarvis` no Linux e no Windows.
 
 > *Just A Rather Very Intelligent System.*
 
@@ -18,6 +18,8 @@ planilhas, PDFs) e interface estilizada. Instalável como comando global
 - **Sandbox:** o agente só lê/escreve dentro de `workspace/` e lê `dados/`.
 - **UI:** banner ASCII, cores e respostas em markdown (via `rich`).
 - **Motor local:** Qwen2.5 GGUF em `llamafile`, sem chave, cota ou internet.
+- **Motores configuráveis:** escolha o provedor, modelo, URL e chave pelo
+  comando `/config`; as credenciais ficam fora do repositório.
 
 ## Instalação
 
@@ -41,12 +43,11 @@ jarvis-qwen            # em um terminal: inicia o Qwen local
 jarvis                 # em outro terminal: abre o chat
 ```
 
-O instalador configura o Qwen local como padrão em `~/.config/jarvis/ambiente`.
-O modelo e o executável ficam, por padrão, em `~/agente-ia/bin/modelo.gguf` e
-`~/agente-ia/bin/llamafile`. Ajuste esses caminhos nesse arquivo caso necessário.
-
-Para voltar ao Gemini, troque `JARVIS_MOTOR=local` por `JARVIS_MOTOR=gemini` em
-`~/.config/jarvis/ambiente` e preencha `~/.config/jarvis/chaves.txt`.
+O modelo e o executável locais ficam, por padrão, em
+`~/agente-ia/bin/modelo.gguf` e `~/agente-ia/bin/llamafile`. Depois de abrir o
+JARVIS, use `/config` para escolher o motor. A escolha fica em
+`~/.config/jarvis/motor.json`; para Gemini, as chaves também podem ser mantidas
+em `~/.config/jarvis/chaves.txt`.
 
 ### Windows
 Copie a pasta `windows/` (ou o zip gerado) para a máquina e dê dois cliques em
@@ -65,7 +66,8 @@ Comandos no chat: `/config` (escolhe e configura o motor), `/motor`, `/chaves`
 Use `/config` para selecionar Gemini, ChatGPT/OpenAI, DeepSeek, Claude, Ollama
 ou o Qwen/llamafile local. A configuração, incluindo chaves, fica em
 `~/.config/jarvis/motor.json` com permissão restrita; reinicie o JARVIS após
-salvar para aplicar o novo motor.
+salvar para aplicar o novo motor. Se faltar uma chave, o assistente oferece a
+configuração ao iniciar.
 
 ## Configuração (`config.py`)
 
@@ -79,6 +81,8 @@ salvar para aplicar o novo motor.
 agente.py        loop ReAct + interface (rich)
 gemini.py        cliente Gemini + pool de chaves com failover
 local.py         cliente do endpoint OpenAI-compatível local
+openai_compat.py adaptador para OpenAI, DeepSeek e Ollama
+claude.py        adaptador para a API Messages da Anthropic
 iniciar-qwen.sh  inicia o llamafile com o modelo GGUF
 ferramentas.py   ferramentas sandboxed
 config.py        configuração
