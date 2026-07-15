@@ -16,22 +16,32 @@ from gemini import PoolChaves, carregar_chaves, chamar
 
 console = Console()
 
-SYSTEM = """Você é um agente de IA que resolve tarefas via terminal usando ferramentas.
+SYSTEM = """Você é um agente de IA de terminal que também é um AGENTE DE CÓDIGO:
+lê, escreve e edita os arquivos do PROJETO do usuário (o diretório de onde o
+jarvis foi chamado), roda comandos e versiona com git. Trabalhe como um bom
+engenheiro: primeiro ENTENDA o projeto (liste, busque, leia os arquivos
+relevantes) e só então edite; faça mudanças pequenas e verificáveis.
 
-Ferramentas:
-- ler_arquivo(caminho)          lê arquivo do workspace
-- escrever_arquivo(caminho, conteudo)  cria/sobrescreve arquivo de texto
-- editar_arquivo(caminho, procurar, substituir)  busca-e-substitui num arquivo
-- listar_diretorio(caminho)     lista arquivos ("." = raiz)
-- criar_planilha(nome, dados, cabecalho)  cria Excel .xlsx; dados = lista de linhas (listas) ou de dicionários
-- criar_pdf(nome, titulo, conteudo, tabela)  cria PDF; conteudo = texto/lista de parágrafos; tabela = lista de linhas (1ª = cabeçalho)
-- rodar_comando(comando)        executa comando no shell do sistema
-- git(args)                     roda git no projeto atual, ex: git("status"), git("commit -m 'msg'")
+Ferramentas de arquivo (agem no PROJETO real, com números de linha):
+- listar_diretorio(caminho, recursivo)  lista arquivos ("." = raiz do projeto); recursivo=True mostra a árvore
+- buscar_codigo(padrao, caminho, ext)  procura texto/regex nos arquivos (tipo grep -rn); ex: buscar_codigo("def main", ext=".py")
+- ler_arquivo(caminho, inicio, fim)    lê o arquivo; inicio/fim = intervalo de linhas (1-based), opcional
+- escrever_arquivo(caminho, conteudo)  cria/sobrescreve um arquivo
+- editar_arquivo(caminho, procurar, substituir)  busca-e-substitui exato num arquivo existente
+
+Outras ferramentas:
+- criar_planilha(nome, dados, cabecalho)  cria Excel .xlsx
+- criar_pdf(nome, titulo, conteudo, tabela)  cria PDF
+- rodar_comando(comando)        executa comando no shell (roda no diretório do projeto)
+- git(args)                     versiona: git("status"), git("diff"), git("commit -m 'msg'")
 - consultar_cve(consulta)       consulta CVEs no NVD por ID (CVE-2021-44228) ou palavra-chave
-- memoria_salvar(texto, tipo)   guarda um fato/decisão/comando pra lembrar nas próximas sessões
-- memoria_listar()              mostra tudo que já foi guardado na memória
-- memoria_esquecer(alvo)        remove memória por #id ou por termo
-- buscar_docs(consulta)         busca nos documentos do usuário
+- memoria_salvar(texto, tipo) / memoria_listar() / memoria_esquecer(alvo)  memória entre sessões
+- buscar_docs(consulta)         busca nos documentos do usuário (base de conhecimento, não é o código)
+
+EDIÇÃO DE CÓDIGO: para alterar um arquivo, LEIA antes (ler_arquivo) e use
+editar_arquivo com um trecho 'procurar' único e literal (copie a indentação
+exata). Para arquivo novo ou reescrita total, use escrever_arquivo. Depois de
+editar, confira com git diff e/ou rodando os testes.
 
 GIT: use a ferramenta git para versionamento (status, diff, log, branch, add,
 commit, push...). Ela age no repositório do diretório atual do usuário. Antes de
@@ -165,10 +175,10 @@ def _perguntar(prompt: str) -> str:
         return ""
 
 
-def _aprovar_comando(pol: permissao.Politica, comando: str):
+def _aprovar_comando(pol: permissao.Politica, comando: str, ferramenta: str = None):
     """Gate interativo 🟢🟡🔴 usando a política da sessão.
     Retorna (permitido, resultado_bloqueio)."""
-    nivel, motivo = pol.classificar(comando)
+    nivel, motivo = pol.classificar(comando, ferramenta=ferramenta)
 
     if nivel == "verde":
         console.print(f"  [green]🟢 seguro[/green] [dim]— {motivo}[/dim]")
@@ -235,7 +245,7 @@ def rodar(motor_chamar, pol: permissao.Politica, historico: list, pergunta: str)
         console.print(f"  [grey50]⚙ {nome}([/grey50][grey62]{_fmt_args(args)}[/grey62][grey50])[/grey50]")
         if permissao.exige_aprovacao(nome):
             comando = permissao.comando_de(nome, args)
-            permitido, bloqueio = _aprovar_comando(pol, comando)
+            permitido, bloqueio = _aprovar_comando(pol, comando, ferramenta=nome)
             if permitido:
                 pol.liberar(comando)          # abre o trinco só p/ esta chamada
                 resultado = ferramentas.executar(nome, args)

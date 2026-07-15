@@ -22,7 +22,13 @@ import aprovacao
 COMANDO_DE_FERRAMENTA = {
     "rodar_comando": lambda a: str((a or {}).get("comando", "")).strip(),
     "git": lambda a: ("git " + str((a or {}).get("args", ""))).strip(),
+    "escrever_arquivo": lambda a: f"escrever_arquivo {(a or {}).get('caminho', '')}".strip(),
+    "editar_arquivo": lambda a: f"editar_arquivo {(a or {}).get('caminho', '')}".strip(),
 }
+
+# Ferramentas de ESCRITA no projeto: risco fixo 🟡 (não são comando de shell,
+# então não passam por aprovacao.classificar; escrevem/sobrescrevem arquivo).
+FERRAMENTAS_ESCRITA = {"escrever_arquivo", "editar_arquivo"}
 
 MODOS = ("blindado", "cauteloso", "auto")   # do mais rígido ao mais solto
 
@@ -64,12 +70,16 @@ class Politica:
         self.sempre = set()       # assinaturas liberadas p/ a sessão inteira
         self._trinco = None       # token de uso único p/ a próxima ferramenta
 
-    def classificar(self, comando: str):
+    def classificar(self, comando: str, ferramenta: str = None):
         """(nivel, motivo) já ajustado pelo modo e pela lista 'sempre'.
         REGRA DE SEGURANÇA: 🔴 nunca é rebaixado — nem por 'sempre', nem por
         modo auto. A assinatura casa 2 tokens, então um 'git commit' liberado
-        JAMAIS pode arrastar um 'git commit ... && rm -rf' (que é 🔴)."""
-        nivel, motivo = aprovacao.classificar(comando, seguros_extra=self.seguros_extra)
+        JAMAIS pode arrastar um 'git commit ... && rm -rf' (que é 🔴).
+        `ferramenta` de escrita de arquivo entra fixa em 🟡 (não é shell)."""
+        if ferramenta in FERRAMENTAS_ESCRITA:
+            nivel, motivo = "amarelo", "escreve/sobrescreve arquivo no projeto"
+        else:
+            nivel, motivo = aprovacao.classificar(comando, seguros_extra=self.seguros_extra)
         if nivel == "amarelo" and assinatura(comando) in self.sempre:
             return "verde", "sempre permitido nesta sessão"
         if nivel == "amarelo" and self.modo == "auto":

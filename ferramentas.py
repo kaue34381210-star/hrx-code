@@ -11,6 +11,12 @@ import config
 import permissao
 
 
+# Diretórios de lixo/geração que a navegação e a busca ignoram.
+_IGNORAR = {".git", "node_modules", ".venv", "venv", "__pycache__",
+            ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build",
+            ".next", ".turbo", "target", ".idea", ".gradle"}
+
+
 def _dentro(base: str, caminho: str) -> str:
     alvo = os.path.normpath(os.path.join(base, caminho))
     if alvo != base and not alvo.startswith(base + os.sep):
@@ -19,34 +25,104 @@ def _dentro(base: str, caminho: str) -> str:
 
 
 def _garantir() -> None:
-    os.makedirs(config.WORKSPACE, exist_ok=True)
     os.makedirs(config.DADOS, exist_ok=True)
 
 
-def ler_arquivo(caminho: str) -> str:
-    alvo = _dentro(config.WORKSPACE, caminho)
+def ler_arquivo(caminho: str, inicio: int = None, fim: int = None) -> str:
+    """Lê um arquivo do PROJETO (config.REPO). Opcional: intervalo de linhas
+    [inicio, fim] (1-based). Retorna com números de linha p/ facilitar edições."""
+    alvo = _dentro(config.REPO, caminho)
     if not os.path.isfile(alvo):
         return f"ERRO: arquivo não existe: {caminho}"
     with open(alvo, "r", encoding="utf-8", errors="replace") as f:
-        conteudo = f.read()
-    return conteudo[:20000] + ("\n...[truncado]" if len(conteudo) > 20000 else "")
+        linhas = f.readlines()
+    total = len(linhas)
+    ini = max(1, int(inicio or 1))
+    f_ = min(total, int(fim or total)) if total else 0
+    largura = len(str(f_)) or 1
+    corpo = "".join(f"{ini + i:>{largura}}\t{l}"
+                    for i, l in enumerate(linhas[ini - 1:f_]))
+    corpo = corpo[:20000] + ("\n...[truncado]" if len(corpo) > 20000 else "")
+    return f"# {caminho} (linhas {ini}-{f_} de {total})\n{corpo}"
 
 
 def escrever_arquivo(caminho: str, conteudo: str) -> str:
-    alvo = _dentro(config.WORKSPACE, caminho)
-    os.makedirs(os.path.dirname(alvo) or config.WORKSPACE, exist_ok=True)
+    """Cria/sobrescreve um arquivo no PROJETO. Passa pelo trinco de aprovação."""
+    if not permissao.consumir(permissao.comando_de("escrever_arquivo", {"caminho": caminho})):
+        return "ERRO: escrita não passou pela aprovação de risco (trinco de segurança)."
+    alvo = _dentro(config.REPO, caminho)
+    os.makedirs(os.path.dirname(alvo) or config.REPO, exist_ok=True)
     with open(alvo, "w", encoding="utf-8") as f:
         f.write(conteudo)
     return f"OK: {len(conteudo)} caracteres gravados em {caminho}"
 
 
-def listar_diretorio(caminho: str = ".") -> str:
-    alvo = _dentro(config.WORKSPACE, caminho)
+def listar_diretorio(caminho: str = ".", recursivo: bool = False) -> str:
+    """Lista o diretório do PROJETO. recursivo=True mostra a árvore (ignora
+    .git/node_modules/.venv/etc.)."""
+    alvo = _dentro(config.REPO, caminho)
     if not os.path.isdir(alvo):
         return f"ERRO: diretório não existe: {caminho}"
-    itens = [n + ("/" if os.path.isdir(os.path.join(alvo, n)) else "")
-             for n in sorted(os.listdir(alvo))]
-    return "\n".join(itens) if itens else "(vazio)"
+    if not recursivo:
+        itens = [n + ("/" if os.path.isdir(os.path.join(alvo, n)) else "")
+                 for n in sorted(os.listdir(alvo))]
+        return "\n".join(itens) if itens else "(vazio)"
+    linhas = []
+    for raiz, dirs, arqs in os.walk(alvo):
+        dirs[:] = sorted(d for d in dirs if d not in _IGNORAR)
+        rel = os.path.relpath(raiz, alvo)
+        nivel = 0 if rel == "." else rel.count(os.sep) + 1
+        if rel != ".":
+            linhas.append("  " * (nivel - 1) + os.path.basename(raiz) + "/")
+        for a in sorted(arqs):
+            linhas.append("  " * nivel + a)
+        if len(linhas) > 400:
+            linhas.append("...[truncado — projeto grande]")
+            break
+    return "\n".join(linhas) if linhas else "(vazio)"
+
+
+def buscar_codigo(padrao: str, caminho: str = ".", ext: str = None) -> str:
+    """Procura texto/regex nos arquivos do PROJETO (tipo grep -rn). `ext` filtra
+    a extensão (ex: '.py'). Retorna 'arquivo:linha: trecho'."""
+    import re as _re
+    base = _dentro(config.REPO, caminho)
+    if not os.path.exists(base):
+        return f"ERRO: caminho não existe: {caminho}"
+    try:
+        rx = _re.compile(padrao)
+    except _re.error as e:
+        return f"ERRO: regex inválida: {e}"
+
+    def varrer(fp):
+        try:
+            with open(fp, "r", encoding="utf-8", errors="ignore") as f:
+                for n, linha in enumerate(f, 1):
+                    if rx.search(linha):
+                        rel = os.path.relpath(fp, config.REPO)
+                        yield f"{rel}:{n}: {linha.strip()[:200]}"
+        except OSError:
+            return
+
+    def arquivos():
+        if os.path.isfile(base):
+            yield base
+            return
+        for raiz, dirs, arqs in os.walk(base):
+            dirs[:] = [d for d in dirs if d not in _IGNORAR]
+            for a in sorted(arqs):
+                yield os.path.join(raiz, a)
+
+    achados = []
+    for fp in arquivos():
+        if ext and not fp.endswith(ext):
+            continue
+        for hit in varrer(fp):
+            achados.append(hit)
+            if len(achados) >= 100:
+                achados.append("...[mais de 100 resultados — refine a busca]")
+                return "\n".join(achados)
+    return "\n".join(achados) if achados else f"Nada encontrado para: {padrao}"
 
 
 def rodar_comando(comando: str) -> str:
@@ -102,8 +178,10 @@ def git(args: str = "") -> str:
 
 
 def editar_arquivo(caminho: str, procurar: str, substituir: str) -> str:
-    """Substitui texto num arquivo existente do workspace (busca-e-substitui)."""
-    alvo = _dentro(config.WORKSPACE, caminho)
+    """Busca-e-substitui num arquivo do PROJETO. Passa pelo trinco de aprovação."""
+    if not permissao.consumir(permissao.comando_de("editar_arquivo", {"caminho": caminho})):
+        return "ERRO: edição não passou pela aprovação de risco (trinco de segurança)."
+    alvo = _dentro(config.REPO, caminho)
     if not os.path.isfile(alvo):
         return f"ERRO: arquivo não existe: {caminho}"
     with open(alvo, "r", encoding="utf-8", errors="replace") as f:
@@ -124,8 +202,8 @@ def criar_planilha(nome: str, dados: list, cabecalho: list = None) -> str:
 
     if not nome.lower().endswith(".xlsx"):
         nome += ".xlsx"
-    alvo = _dentro(config.WORKSPACE, nome)
-    os.makedirs(os.path.dirname(alvo) or config.WORKSPACE, exist_ok=True)
+    alvo = _dentro(config.REPO, nome)
+    os.makedirs(os.path.dirname(alvo) or config.REPO, exist_ok=True)
 
     wb = Workbook()
     ws = wb.active
@@ -168,8 +246,8 @@ def criar_pdf(nome: str, titulo: str = None, conteudo=None, tabela: list = None)
 
     if not nome.lower().endswith(".pdf"):
         nome += ".pdf"
-    alvo = _dentro(config.WORKSPACE, nome)
-    os.makedirs(os.path.dirname(alvo) or config.WORKSPACE, exist_ok=True)
+    alvo = _dentro(config.REPO, nome)
+    os.makedirs(os.path.dirname(alvo) or config.REPO, exist_ok=True)
 
     estilos = getSampleStyleSheet()
     flow = []
@@ -352,6 +430,7 @@ REGISTRO = {
     "escrever_arquivo": escrever_arquivo,
     "editar_arquivo": editar_arquivo,
     "listar_diretorio": listar_diretorio,
+    "buscar_codigo": buscar_codigo,
     "criar_planilha": criar_planilha,
     "criar_pdf": criar_pdf,
     "rodar_comando": rodar_comando,

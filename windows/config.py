@@ -43,7 +43,7 @@ def _arq_chaves() -> str:
 ARQ_CHAVES = _arq_chaves()   # 1 chave por linha (NUNCA versionar)
 TEMPERATURA = 0.3
 TIMEOUT = 60          # segundos por request
-MAX_ITER = 10         # trava anti-loop do ReAct
+MAX_ITER = int(os.environ.get("JARVIS_MAX_ITER", "20"))  # passos do ReAct (código = mais passos)
 
 # --- Contexto da conversa: orçamento (em caracteres) da janela de histórico
 # enviada ao modelo a cada turno. Mantém as mensagens mais RECENTES dentro do
