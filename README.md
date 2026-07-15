@@ -1,9 +1,10 @@
 # 🦾 HRX CODE — agente de IA de terminal
 
-Agente de IA de terminal com motores **Gemini**, **ChatGPT/OpenAI**,
-**DeepSeek**, **Claude**, **Ollama** e **Qwen local**. Tem rotação automática
-das chaves Gemini, ferramentas para código e documentos, além de uma interface
-estilizada. Roda direto do repositório com `python agente.py`.
+Agente de IA de terminal com motor padrão **local** e suporte a
+**Gemini**, **ChatGPT/OpenAI**, **DeepSeek**, **Claude** e **Ollama**.
+Tem rotação automática das chaves Gemini, ferramentas para código e documentos,
+além de uma interface estilizada. Roda direto do repositório com
+`python agente.py`.
 
 > *HRX CODE — seu agente de IA no terminal.*
 
@@ -17,7 +18,7 @@ estilizada. Roda direto do repositório com `python agente.py`.
   - `rodar_comando` (whitelist de segurança), `buscar_docs` (RAG simples)
 - **Sandbox:** o agente só lê/escreve dentro de `workspace/` e lê `dados/`.
 - **UI:** banner ASCII, cores e respostas em markdown (via `rich`).
-- **Motor local:** Qwen2.5 GGUF em `llamafile`, sem chave, cota ou internet.
+- **Motor local padrão:** Qwen2.5 GGUF em `llamafile`, sem chave, cota ou internet.
 - **Motores configuráveis:** escolha o provedor, modelo, URL e chave pelo
   comando `/config`; as credenciais ficam fora do repositório.
 - **Memória compacta no prompt:** carrega só um resumo curto das memórias para
@@ -62,10 +63,10 @@ Comandos no chat: `/config` (escolhe e configura o motor), `/motor`, `/chaves`
 `/sair`.
 
 Use `/config` para selecionar Gemini, ChatGPT/OpenAI, DeepSeek, Claude, Ollama
-ou o Qwen/llamafile local. A configuração, incluindo chaves, fica em
-`~/.config/hrx/motor.json` com permissão restrita; reinicie o HRX CODE após
-salvar para aplicar o novo motor. Se faltar uma chave, o assistente oferece a
-configuração ao iniciar.
+ou o Qwen/llamafile local. O padrão inicial é o motor local. A configuração,
+incluindo chaves, fica em `~/.config/hrx/motor.json` com permissão restrita;
+reinicie o HRX CODE após salvar para aplicar o novo motor. Se faltar uma
+chave, o assistente oferece a configuração ao iniciar.
 
 ## Memória do projeto
 

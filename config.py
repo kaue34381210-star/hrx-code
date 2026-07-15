@@ -103,7 +103,8 @@ IDIOMA = str(_pref("AGENTE_IDIOMA", "idioma", "pt-BR")).strip()
 PROJETO = str(_pref("AGENTE_PROJETO", "projeto", "")).strip()
 
 # --- Seleção de motor: gemini · local · openai · deepseek · ollama · claude ---
-MOTOR = str(_cfg("HRX_MOTOR", "motor", "gemini")).strip().lower()
+# Padrão do HRX CODE: motor local, sem chave e sem depender de internet.
+MOTOR = str(_cfg("HRX_MOTOR", "motor", "local")).strip().lower()
 
 # --- Motor Gemini ---
 MODELO = _cfg("GEMINI_MODELO", "gemini_modelo", "gemini-2.0-flash")
