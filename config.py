@@ -69,3 +69,9 @@ COMANDOS_PERMITIDOS = {
     "hostname", "grep", "find", "head", "tail", "wc",
 }
 TIMEOUT_COMANDO = 30
+
+# Modo de permissões da sessão (alternável em runtime com /modo):
+#   blindado  = pergunta em TUDO (até 🟢)
+#   cauteloso = pergunta em 🟡 e 🔴 (padrão)
+#   auto      = 🟡 roda direto; só 🔴 pergunta (fluxo ágil p/ tarefas de código)
+MODO = os.environ.get("JARVIS_MODO", "cauteloso").strip().lower()

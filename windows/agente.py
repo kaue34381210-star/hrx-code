@@ -8,10 +8,10 @@ from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
 
-import aprovacao
 import config
 import ferramentas
 import local
+import permissao
 from gemini import PoolChaves, carregar_chaves, chamar
 
 console = Console()
@@ -157,14 +157,6 @@ def _fmt_args(args: dict) -> str:
     return ", ".join(f"{k}={str(v)[:40]!r}" for k, v in (args or {}).items())
 
 
-# Ferramentas que passam pelo filtro de risco 🟢🟡🔴, e como montar a string
-# de comando que será classificada a partir dos args.
-_COMANDO_DE_FERRAMENTA = {
-    "rodar_comando": lambda a: str(a.get("comando", "")),
-    "git": lambda a: ("git " + str(a.get("args", ""))).strip(),
-}
-
-
 def _perguntar(prompt: str) -> str:
     """Lê confirmação do usuário. Sem terminal interativo → trata como recusa."""
     try:
@@ -173,10 +165,10 @@ def _perguntar(prompt: str) -> str:
         return ""
 
 
-def _aprovar_comando(comando: str):
-    """Filtro de risco 🟢🟡🔴. Retorna (permitido, resultado_bloqueio)."""
-    extras = getattr(config, "COMANDOS_PERMITIDOS", ())
-    nivel, motivo = aprovacao.classificar(comando, seguros_extra=extras)
+def _aprovar_comando(pol: permissao.Politica, comando: str):
+    """Gate interativo 🟢🟡🔴 usando a política da sessão.
+    Retorna (permitido, resultado_bloqueio)."""
+    nivel, motivo = pol.classificar(comando)
 
     if nivel == "verde":
         console.print(f"  [green]🟢 seguro[/green] [dim]— {motivo}[/dim]")
@@ -184,8 +176,14 @@ def _aprovar_comando(comando: str):
 
     if nivel == "amarelo":
         console.print(f"  [yellow]🟡 confirmação[/yellow] [dim]— {motivo}[/dim]")
-        ok = _perguntar("  [yellow]executar?[/yellow] [dim][Enter=sim · n=não][/dim] › ") \
-            .lower() not in ("n", "nao", "não", "no", "cancelar")
+        r = _perguntar("  [yellow]executar?[/yellow] "
+                       "[dim][Enter=sim · n=não · s=sempre][/dim] › ").lower()
+        if r in ("s", "sempre", "a", "always"):
+            assi = pol.liberar_sempre(comando)
+            console.print(f"  [dim]⭐ '{assi}' liberado pra sessão inteira.[/dim]")
+            ok = True
+        else:
+            ok = r not in ("n", "nao", "não", "no", "cancelar")
     else:  # vermelho
         console.print(f"  [red]🔴 ALTO RISCO[/red] [bold red]— {motivo}[/bold red]")
         ok = _perguntar("  [red]para executar digite[/red] [bold]sim[/bold] › ") \
@@ -212,11 +210,12 @@ def _janela(historico: list) -> list:
     return list(reversed(mantidos))
 
 
-def rodar(motor_chamar, historico: list, pergunta: str) -> str:
+def rodar(motor_chamar, pol: permissao.Politica, historico: list, pergunta: str) -> str:
     """Executa um turno do usuário mantendo o HISTÓRICO da conversa.
     `motor_chamar(mensagens) -> texto` (Gemini ou local). `historico` é a lista
     de mensagens da conversa (sem o system); é mutada in-place, então persiste
-    entre os turnos do REPL — é isso que dá memória de curto prazo ao agente."""
+    entre os turnos do REPL — é isso que dá memória de curto prazo ao agente.
+    `pol` é a política de permissões da sessão."""
     system_msg = {"role": "system", "content": _montar_system()}
     historico.append({"role": "user", "content": pergunta})
     for _ in range(config.MAX_ITER):
@@ -234,10 +233,14 @@ def rodar(motor_chamar, historico: list, pergunta: str) -> str:
             return texto
         args = acao.get("args", {})
         console.print(f"  [grey50]⚙ {nome}([/grey50][grey62]{_fmt_args(args)}[/grey62][grey50])[/grey50]")
-        extrair_cmd = _COMANDO_DE_FERRAMENTA.get(nome)
-        if extrair_cmd:
-            permitido, bloqueio = _aprovar_comando(extrair_cmd(args))
-            resultado = ferramentas.executar(nome, args) if permitido else bloqueio
+        if permissao.exige_aprovacao(nome):
+            comando = permissao.comando_de(nome, args)
+            permitido, bloqueio = _aprovar_comando(pol, comando)
+            if permitido:
+                pol.liberar(comando)          # abre o trinco só p/ esta chamada
+                resultado = ferramentas.executar(nome, args)
+            else:
+                resultado = bloqueio
         else:
             resultado = ferramentas.executar(nome, args)
         historico.append({"role": "user",
@@ -245,26 +248,53 @@ def rodar(motor_chamar, historico: list, pergunta: str) -> str:
     return "Parei: atingi o limite de passos sem resposta final."
 
 
-def _comando_especial(pool, historico: list, entrada: str) -> bool:
-    """Trata /comandos. `pool` é None quando o motor é local. `historico` é a
-    conversa atual (mutável). Retorna True se consumiu a entrada."""
+def _comando_especial(pool, pol: permissao.Politica, historico: list,
+                      entrada: str) -> bool:
+    """Trata /comandos. `pool` é None quando o motor é local. `pol` é a política
+    de permissões, `historico` a conversa atual (mutável). Retorna True se
+    consumiu a entrada."""
     cmd = entrada.lower()
+    partes = cmd.split()
     if cmd in ("/sair", "sair", "exit", "quit", "/quit"):
         console.print("[dim]até mais 👋[/dim]")
         raise SystemExit(0)
     if cmd in ("/ajuda", "/help"):
         console.print(Panel(
-            "[cyan]/motor[/cyan]     mostra qual motor está em uso\n"
-            "[cyan]/chaves[/cyan]    status das chaves (só motor gemini)\n"
-            "[cyan]/memoria[/cyan]   mostra o que o JARVIS já lembra\n"
-            "[cyan]/novo[/cyan]      começa uma conversa nova (esquece o contexto atual)\n"
-            "[cyan]/limpar[/cyan]    limpa a tela\n"
-            "[cyan]/sair[/cyan]      encerra",
+            "[cyan]/motor[/cyan]       mostra qual motor está em uso\n"
+            "[cyan]/chaves[/cyan]      status das chaves (só motor gemini)\n"
+            "[cyan]/modo[/cyan] [dim]<m>[/dim]   permissões: [dim]blindado · cauteloso · auto[/dim]\n"
+            "[cyan]/permissoes[/cyan]  mostra modo e a lista 'sempre permitir'\n"
+            "[cyan]/memoria[/cyan]     mostra o que o JARVIS já lembra\n"
+            "[cyan]/novo[/cyan]        começa uma conversa nova (esquece o contexto)\n"
+            "[cyan]/limpar[/cyan]      limpa a tela\n"
+            "[cyan]/sair[/cyan]        encerra",
             title="comandos", border_style="grey37", padding=(0, 2)))
         return True
     if cmd in ("/novo", "/reset"):
         historico.clear()
         console.print("  [dim]🧹 conversa reiniciada — contexto anterior esquecido.[/dim]")
+        return True
+    if partes and partes[0] == "/modo":
+        if len(partes) > 1:
+            novo = partes[1]
+            if novo in permissao.MODOS:
+                pol.modo = novo
+                console.print(f"  [green]✓[/green] modo de permissões: [cyan]{novo}[/cyan]")
+            else:
+                console.print(f"  [red]modo inválido[/red] — use: "
+                              f"{' · '.join(permissao.MODOS)}")
+        else:
+            console.print(f"  modo atual: [cyan]{pol.modo}[/cyan]  "
+                          f"[dim]({' · '.join(permissao.MODOS)})[/dim]")
+            console.print("  [dim]blindado=pergunta tudo · cauteloso=🟡🔴 · "
+                          "auto=só 🔴[/dim]")
+        return True
+    if cmd in ("/permissoes", "/permissões", "/perm"):
+        sempre = ", ".join(sorted(pol.sempre)) if pol.sempre else "(nenhum)"
+        console.print(Panel(
+            f"modo: [cyan]{pol.modo}[/cyan]\n"
+            f"sempre permitir: [green]{sempre}[/green]",
+            title="🔐 permissões", border_style="grey37", padding=(0, 2)))
         return True
     if cmd in ("/memoria", "/memorias"):
         console.print(Panel(ferramentas.memoria_listar(),
@@ -329,12 +359,18 @@ def main() -> None:
     motor_chamar, pool, rotulo = _preparar_motor()
     banner(rotulo, len(ferramentas.carregar_memorias()))
 
+    # política de permissões da sessão (modo via JARVIS_MODO; registra o
+    # singleton que as ferramentas consultam pelo trinco).
+    pol = permissao.Politica(modo=getattr(config, "MODO", "cauteloso"),
+                             seguros_extra=getattr(config, "COMANDOS_PERMITIDOS", ()))
+    permissao.usar(pol)
+
     historico: list = []   # conversa viva; persiste entre turnos do REPL
 
     arg = " ".join(sys.argv[1:]).strip()
     if arg:  # modo one-shot
         try:
-            resposta = rodar(motor_chamar, historico, arg)
+            resposta = rodar(motor_chamar, pol, historico, arg)
         except Exception as e:  # noqa: BLE001
             console.print(f"[red]erro:[/red] {e}")
             sys.exit(1)
@@ -352,9 +388,9 @@ def main() -> None:
         if not entrada:
             continue
         try:
-            if _comando_especial(pool, historico, entrada):
+            if _comando_especial(pool, pol, historico, entrada):
                 continue
-            resposta = rodar(motor_chamar, historico, entrada)
+            resposta = rodar(motor_chamar, pol, historico, entrada)
             console.print()
             console.print(Panel(Markdown(resposta),
                                 title=f"[green]{config.NOME}", border_style="green", padding=(1, 2)))

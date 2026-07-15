@@ -13,7 +13,8 @@ verdadeira barreira.
 import os
 import re
 
-# Executáveis claramente somente-leitura → 🟢
+# Executáveis claramente somente-leitura → 🟢. Formas perigosas destes (ex:
+# `find -delete`, `git push -f`) são pegas ANTES, nos padrões VERMELHO/AMARELO.
 SEGUROS = {
     "ls", "dir", "pwd", "cat", "type", "head", "tail", "echo", "printf",
     "whoami", "hostname", "date", "uptime", "cal", "df", "du", "free",
@@ -22,6 +23,37 @@ SEGUROS = {
     "cut", "column", "tr", "grep", "egrep", "fgrep", "rg", "file", "stat",
     "tree", "basename", "dirname", "realpath", "readlink", "history",
     "man", "help", "clear", "cd", "test", "true", "false",
+    # leitura/consulta acrescentados (formas destrutivas já pegas acima)
+    "find", "locate", "less", "more", "diff", "comm", "cmp", "pgrep",
+    "md5sum", "sha1sum", "sha256sum", "sha512sum", "b2sum", "cksum",
+    "lsblk", "lscpu", "lsusb", "lspci", "lsof", "ss", "netstat",
+    "ping", "ping6", "dig", "nslookup", "host", "jobs", "alias",
+    "command", "apropos", "getent", "hexdump", "xxd", "strings",
+}
+
+# Subcomandos SÓ-LEITURA de ferramentas que, no geral, modificam → 🟢.
+# (o resto dessas ferramentas continua 🟡 via MUTANTES/AMARELO.)
+LEITURA_POR_SUB = {
+    "pip": {"list", "show", "freeze", "search", "index", "check", "--version", "-v"},
+    "pip3": {"list", "show", "freeze", "search", "index", "check", "--version", "-v"},
+    "npm": {"ls", "list", "view", "outdated", "audit", "root", "config", "help", "--version", "-v"},
+    "pnpm": {"ls", "list", "outdated", "why", "--version"},
+    "yarn": {"list", "why", "info", "--version"},
+    "docker": {"ps", "images", "image", "logs", "inspect", "version", "info",
+               "stats", "top", "port", "history", "diff", "search"},
+    "podman": {"ps", "images", "image", "logs", "inspect", "version", "info", "stats", "top"},
+    "kubectl": {"get", "describe", "logs", "version", "top", "explain",
+                "api-resources", "config", "cluster-info"},
+    "systemctl": {"status", "list-units", "list-unit-files", "is-active",
+                  "is-enabled", "is-failed", "show", "cat", "get-default"},
+    "service": {"status"},
+    "cargo": {"--version", "tree", "search"},
+    "go": {"version", "env", "list", "doc"},
+    "apt": {"list", "show", "search", "policy", "--version"},
+    "apt-get": {"--version"},
+    "dnf": {"list", "info", "search", "repolist"},
+    "yum": {"list", "info", "search"},
+    "brew": {"list", "info", "search", "outdated", "--version"},
 }
 
 # Padrões de ALTO RISCO → 🔴 (verificados primeiro, ganham de tudo)
@@ -114,6 +146,13 @@ def classificar(comando: str, seguros_extra=()) -> tuple:
                    "shortlog", "reflog", "config", "tag", "cat-file", ""}:
             return ("verde", f"git {sub} (leitura)".strip())
         return ("amarelo", "altera o repositório git")
+
+    # 3b) subcomando só-leitura de uma ferramenta que costuma modificar → 🟢
+    if exe in LEITURA_POR_SUB:
+        partes = c.split()
+        sub = partes[1].lower() if len(partes) > 1 else ""
+        if sub in LEITURA_POR_SUB[exe]:
+            return ("verde", f"{exe} {sub} (leitura)")
 
     # 4) seguros conhecidos (mais os liberados via config)
     if exe in SEGUROS or exe in set(seguros_extra):

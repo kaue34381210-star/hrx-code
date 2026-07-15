@@ -8,6 +8,7 @@ import datetime
 import subprocess
 
 import config
+import permissao
 
 
 def _dentro(base: str, caminho: str) -> str:
@@ -56,6 +57,10 @@ def rodar_comando(comando: str) -> str:
     comando = comando.strip()
     if not comando:
         return "ERRO: comando vazio"
+    # TRINCO: só executa se o gate de permissões liberou ESTE comando agora.
+    if not permissao.consumir(comando):
+        return ("ERRO: comando não passou pela aprovação de risco (trinco de "
+                "segurança). Chame pelo fluxo normal — não há como pular o gate.")
     try:
         r = subprocess.run(comando, cwd=config.REPO, shell=True,
                            capture_output=True, text=True,
@@ -69,6 +74,11 @@ def rodar_comando(comando: str) -> str:
 def git(args: str = "") -> str:
     """Roda `git <args>` no repositório atual (config.REPO). A liberação por
     risco (🟢🟡🔴) acontece na camada de aprovação (agente.py)."""
+    # TRINCO: mesmo esquema do rodar_comando. A string liberada pelo gate é
+    # "git <args>" (ver permissao.COMANDO_DE_FERRAMENTA["git"]).
+    if not permissao.consumir(("git " + (args or "")).strip()):
+        return ("ERRO: git não passou pela aprovação de risco (trinco de "
+                "segurança). Chame pelo fluxo normal.")
     try:
         partes = shlex.split(args)
     except ValueError as e:
