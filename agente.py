@@ -1,6 +1,9 @@
 """Agente de terminal com motor Gemini e failover de chaves."""
 import json
 import sys
+import getpass
+import importlib
+import os
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -8,9 +11,11 @@ from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
 
+import claude
 import config
 import ferramentas
 import local
+import openai_compat
 import permissao
 from gemini import PoolChaves, carregar_chaves, chamar
 
@@ -175,6 +180,14 @@ def _perguntar(prompt: str) -> str:
         return ""
 
 
+def _ler_segredo(prompt: str) -> str:
+    """Lê uma chave sem mostrá-la no terminal; Ctrl+C cancela."""
+    try:
+        return getpass.getpass(prompt).strip()
+    except (EOFError, KeyboardInterrupt):
+        return ""
+
+
 def _aprovar_comando(pol: permissao.Politica, comando: str, ferramenta: str = None):
     """Gate interativo 🟢🟡🔴 usando a política da sessão.
     Retorna (permitido, resultado_bloqueio)."""
@@ -258,6 +271,67 @@ def rodar(motor_chamar, pol: permissao.Politica, historico: list, pergunta: str)
     return "Parei: atingi o limite de passos sem resposta final."
 
 
+def _configurar_motor() -> None:
+    """Assistente interativo de configuração persistente dos motores."""
+    opcoes = {
+        "1": ("gemini", "Gemini"), "2": ("openai", "ChatGPT / OpenAI"),
+        "3": ("deepseek", "DeepSeek"), "4": ("claude", "Claude"),
+        "5": ("ollama", "Ollama local"), "6": ("local", "Llamafile / Qwen local"),
+    }
+    console.print(Panel(
+        "[cyan]1[/cyan] Gemini\n[cyan]2[/cyan] ChatGPT / OpenAI\n"
+        "[cyan]3[/cyan] DeepSeek\n[cyan]4[/cyan] Claude\n"
+        "[cyan]5[/cyan] Ollama local\n[cyan]6[/cyan] Llamafile / Qwen local",
+        title="⚙ configurar motor", border_style="cyan", padding=(0, 2)))
+    escolha = _perguntar("  escolha [1-6] (Enter cancela) › ")
+    if escolha not in opcoes:
+        console.print("  [dim]configuração cancelada.[/dim]")
+        return
+
+    motor, rotulo = opcoes[escolha]
+    dados = dict(config._CFG)
+    dados["motor"] = motor
+    campos = {
+        "openai": ("openai", "https://api.openai.com/v1/chat/completions", "gpt-4o-mini"),
+        "deepseek": ("deepseek", "https://api.deepseek.com/v1/chat/completions", "deepseek-chat"),
+        "claude": ("claude", "https://api.anthropic.com/v1/messages", "claude-opus-4-8"),
+        "ollama": ("ollama", "http://127.0.0.1:11434/v1/chat/completions", "llama3.1"),
+    }
+    if motor == "gemini":
+        chave = _ler_segredo("  chave Gemini (Enter mantém as chaves atuais) › ")
+        if chave:
+            pasta = os.path.dirname(config.ARQ_CHAVES)
+            if pasta:
+                os.makedirs(pasta, exist_ok=True)
+            with open(config.ARQ_CHAVES, "a", encoding="utf-8") as f:
+                f.write(chave + "\n")
+            try:
+                os.chmod(config.ARQ_CHAVES, 0o600)
+            except OSError:
+                pass
+        modelo = _perguntar(f"  modelo Gemini [{config.MODELO}] › ")
+        if modelo:
+            dados["gemini_modelo"] = modelo
+    elif motor == "local":
+        url = _perguntar(f"  URL [{config.LOCAL_URL}] › ") or config.LOCAL_URL
+        modelo = _perguntar(f"  modelo [{config.MODELO_LOCAL}] › ") or config.MODELO_LOCAL
+        dados.update({"local_url": url, "local_modelo": modelo})
+    else:
+        prefixo, url_padrao, modelo_padrao = campos[motor]
+        atual = config.provedor(motor)
+        url = _perguntar(f"  URL [{atual.get('url', url_padrao)}] › ") or atual.get("url", url_padrao)
+        modelo = _perguntar(f"  modelo [{atual.get('modelo', modelo_padrao)}] › ") or atual.get("modelo", modelo_padrao)
+        chave = "" if motor == "ollama" else _ler_segredo("  chave API (Enter mantém a atual) › ")
+        dados[f"{prefixo}_url"] = url
+        dados[f"{prefixo}_modelo"] = modelo
+        if chave:
+            dados[f"{prefixo}_key"] = chave
+
+    config.salvar_motor(dados)
+    importlib.reload(config)
+    console.print(f"  [green]✓[/green] {rotulo} configurado e salvo em [dim]{config.ARQ_MOTOR}[/dim].")
+
+
 def _comando_especial(pool, pol: permissao.Politica, historico: list,
                       entrada: str) -> bool:
     """Trata /comandos. `pool` é None quando o motor é local. `pol` é a política
@@ -271,6 +345,7 @@ def _comando_especial(pool, pol: permissao.Politica, historico: list,
     if cmd in ("/ajuda", "/help"):
         console.print(Panel(
             "[cyan]/motor[/cyan]       mostra qual motor está em uso\n"
+            "[cyan]/config[/cyan]      escolhe e configura o motor de IA\n"
             "[cyan]/chaves[/cyan]      status das chaves (só motor gemini)\n"
             "[cyan]/modo[/cyan] [dim]<m>[/dim]   permissões: [dim]blindado · cauteloso · auto[/dim]\n"
             "[cyan]/permissoes[/cyan]  mostra modo e a lista 'sempre permitir'\n"
@@ -279,6 +354,10 @@ def _comando_especial(pool, pol: permissao.Politica, historico: list,
             "[cyan]/limpar[/cyan]      limpa a tela\n"
             "[cyan]/sair[/cyan]        encerra",
             title="comandos", border_style="grey37", padding=(0, 2)))
+        return True
+    if cmd == "/config":
+        _configurar_motor()
+        console.print("  [dim]A nova configuração será usada na próxima vez que abrir o JARVIS.[/dim]")
         return True
     if cmd in ("/novo", "/reset"):
         historico.clear()
@@ -315,9 +394,15 @@ def _comando_especial(pool, pol: permissao.Politica, historico: list,
             estado = "[green]no ar[/green]" if local.disponivel() else "[red]fora do ar[/red]"
             console.print(f"  motor: [cyan]local[/cyan] · {config.MODELO_LOCAL} · "
                           f"{config.LOCAL_URL} ({estado})")
-        else:
+        elif config.MOTOR == "gemini":
             console.print(f"  motor: [cyan]gemini[/cyan] · {config.MODELO} · "
                           f"{pool.n if pool else 0} chave(s)")
+        else:
+            p = config.provedor(config.MOTOR)
+            tem = "[green]chave ok[/green]" if p.get("chave") else \
+                ("[dim]sem chave[/dim]" if p.get("exige_chave") else "[dim]local[/dim]")
+            console.print(f"  motor: [cyan]{config.MOTOR}[/cyan] · "
+                          f"{p.get('modelo', '?')} · {tem}")
         return True
     if cmd == "/chaves":
         if pool is None:
@@ -333,13 +418,28 @@ def _comando_especial(pool, pol: permissao.Politica, historico: list,
     return False
 
 
+def _erro_sem_chave(rotulo: str) -> None:
+    console.print(Panel(
+        f"O motor [bold]{rotulo}[/bold] precisa de uma chave de API e nenhuma "
+        f"foi encontrada.\n\nConfigure com [cyan]/config[/cyan] (ou defina a "
+        f"variável de ambiente correspondente).",
+        title="[red]sem chave", border_style="red"))
+    if sys.stdin.isatty():
+        resposta = _perguntar("  configurar agora? [Enter=sim · n=não] › ").lower()
+        if resposta not in ("n", "nao", "não", "no", "cancelar"):
+            _configurar_motor()
+            console.print("  [dim]Abra o JARVIS novamente para usar o motor escolhido.[/dim]")
+    sys.exit(1)
+
+
 def _preparar_motor():
     """Monta (motor_chamar, pool, rotulo) conforme config.MOTOR.
-    pool é None no motor local."""
-    if config.MOTOR not in ("gemini", "local"):
+    pool só existe no motor gemini (failover de chaves); nos outros é None."""
+    if config.MOTOR not in config.MOTORES:
         raise RuntimeError(
             "JARVIS_MOTOR inválido: " + repr(config.MOTOR) +
-            ". Use 'local' ou 'gemini'.")
+            ". Use um de: " + " · ".join(config.MOTORES) + ".")
+
     if config.MOTOR == "local":
         online = local.disponivel()
         estado = "[green]no ar[/green]" if online else "[red]fora do ar — suba o servidor[/red]"
@@ -350,6 +450,18 @@ def _preparar_motor():
                 f"Suba o servidor numa outra aba:\n[cyan]{local.DICA_SERVIDOR}[/cyan]",
                 title="[yellow]motor local fora do ar", border_style="yellow"))
         return (lambda msgs: local.chamar(msgs)[0]), None, rotulo
+
+    # Motores por API (protocolo OpenAI: openai/deepseek/ollama; Anthropic: claude)
+    if config.MOTOR in ("openai", "deepseek", "ollama", "claude"):
+        p = config.provedor(config.MOTOR)
+        if p["exige_chave"] and not p["chave"]:
+            _erro_sem_chave(p["rotulo"])
+        if p["protocolo"] == "anthropic":
+            fn = (lambda msgs, p=p: claude.chamar(msgs, p["chave"], p["modelo"])[0])
+        else:
+            fn = (lambda msgs, p=p: openai_compat.chamar(
+                msgs, p["url"], p["modelo"], p["chave"] or None)[0])
+        return fn, None, f"motor {p['rotulo']} · {p['modelo']}"
 
     chaves = carregar_chaves()
     if not chaves:

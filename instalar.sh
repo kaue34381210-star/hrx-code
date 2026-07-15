@@ -14,7 +14,7 @@ echo "┌─ Instalando JARVIS ────────────────�
 # 1) código
 echo "│ copiando código..."
 mkdir -p "$DEST" "$DEST/workspace" "$DEST/dados" "$CFG" "$BIN"
-cp "$SRC"/config.py "$SRC"/ferramentas.py "$SRC"/gemini.py "$SRC"/local.py "$SRC"/aprovacao.py "$SRC"/permissao.py "$SRC"/agente.py "$SRC"/iniciar-qwen.sh "$DEST"/
+cp "$SRC"/config.py "$SRC"/ferramentas.py "$SRC"/gemini.py "$SRC"/local.py "$SRC"/openai_compat.py "$SRC"/claude.py "$SRC"/aprovacao.py "$SRC"/permissao.py "$SRC"/agente.py "$SRC"/iniciar-qwen.sh "$DEST"/
 [ -f "$SRC/teste_failover.py" ] && cp "$SRC/teste_failover.py" "$DEST"/
 [ -f "$SRC/teste_aprovacao.py" ] && cp "$SRC/teste_aprovacao.py" "$DEST"/
 [ -f "$SRC/teste_local.py" ] && cp "$SRC/teste_local.py" "$DEST"/

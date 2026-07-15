@@ -59,14 +59,19 @@ jarvis                 # chat interativo
 jarvis "sua tarefa"    # pergunta única (one-shot)
 ```
 
-Comandos no chat: `/motor`, `/chaves` (status das chaves no Gemini), `/limpar`,
-`/ajuda`, `/sair`.
+Comandos no chat: `/config` (escolhe e configura o motor), `/motor`, `/chaves`
+(status das chaves no Gemini), `/limpar`, `/ajuda`, `/sair`.
+
+Use `/config` para selecionar Gemini, ChatGPT/OpenAI, DeepSeek, Claude, Ollama
+ou o Qwen/llamafile local. A configuração, incluindo chaves, fica em
+`~/.config/jarvis/motor.json` com permissão restrita; reinicie o JARVIS após
+salvar para aplicar o novo motor.
 
 ## Configuração (`config.py`)
 
 - `NOME` — nome exibido no banner
-- `MODELO` — modelo Gemini (padrão `gemini-2.0-flash`)
-- `COMANDOS_PERMITIDOS` — whitelist do `rodar_comando`
+- Use `/config` para trocar motor, modelo, URL e chave sem editar arquivos.
+- `COMANDOS_PERMITIDOS` — comandos tratados como seguros pela política
 
 ## Arquitetura
 
