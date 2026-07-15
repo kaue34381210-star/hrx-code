@@ -56,6 +56,8 @@ python agente.py "tarefa"   # pergunta única (one-shot)
 ```
 
 Dica para subir o motor local em outro terminal: `./iniciar-qwen.sh`.
+Se o `llamafile` ou o `.gguf` estiverem em outro lugar, defina
+`HRX_LLAMAFILE` e `HRX_MODELO_GGUF`.
 Dica: crie um atalho `hrx` apontando para `.venv/bin/python agente.py`.
 
 Comandos no chat: `/config` (escolhe e configura o motor), `/motor`, `/chaves`
