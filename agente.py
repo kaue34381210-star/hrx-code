@@ -199,13 +199,31 @@ def _aprovar_comando(comando: str):
     return True, None
 
 
-def rodar(motor_chamar, pergunta: str) -> str:
-    """motor_chamar(mensagens) -> texto do modelo (Gemini ou local)."""
-    mensagens = [{"role": "system", "content": _montar_system()},
-                 {"role": "user", "content": pergunta}]
+def _janela(historico: list) -> list:
+    """Mantém as mensagens mais RECENTES dentro do orçamento de contexto, pra
+    conversa longa não estourar o limite do modelo (especialmente o local)."""
+    orcamento = config.CONTEXTO_MAX_CHARS
+    total, mantidos = 0, []
+    for m in reversed(historico):
+        total += len(m.get("content", ""))
+        if total > orcamento and mantidos:
+            break
+        mantidos.append(m)
+    return list(reversed(mantidos))
+
+
+def rodar(motor_chamar, historico: list, pergunta: str) -> str:
+    """Executa um turno do usuário mantendo o HISTÓRICO da conversa.
+    `motor_chamar(mensagens) -> texto` (Gemini ou local). `historico` é a lista
+    de mensagens da conversa (sem o system); é mutada in-place, então persiste
+    entre os turnos do REPL — é isso que dá memória de curto prazo ao agente."""
+    system_msg = {"role": "system", "content": _montar_system()}
+    historico.append({"role": "user", "content": pergunta})
     for _ in range(config.MAX_ITER):
+        mensagens = [system_msg] + _janela(historico)
         with console.status("[cyan]pensando...", spinner="dots"):
             texto = motor_chamar(mensagens)
+        historico.append({"role": "assistant", "content": texto})
         acao = extrair_json(texto)
         if acao is None:
             return texto
@@ -222,15 +240,14 @@ def rodar(motor_chamar, pergunta: str) -> str:
             resultado = ferramentas.executar(nome, args) if permitido else bloqueio
         else:
             resultado = ferramentas.executar(nome, args)
-        mensagens.append({"role": "assistant", "content": texto})
-        mensagens.append({"role": "user",
+        historico.append({"role": "user",
                           "content": f"RESULTADO da ferramenta {nome}:\n{resultado}"})
     return "Parei: atingi o limite de passos sem resposta final."
 
 
-def _comando_especial(pool, entrada: str) -> bool:
-    """Trata /comandos. `pool` é None quando o motor é local. Retorna True
-    se consumiu a entrada."""
+def _comando_especial(pool, historico: list, entrada: str) -> bool:
+    """Trata /comandos. `pool` é None quando o motor é local. `historico` é a
+    conversa atual (mutável). Retorna True se consumiu a entrada."""
     cmd = entrada.lower()
     if cmd in ("/sair", "sair", "exit", "quit", "/quit"):
         console.print("[dim]até mais 👋[/dim]")
@@ -240,9 +257,14 @@ def _comando_especial(pool, entrada: str) -> bool:
             "[cyan]/motor[/cyan]     mostra qual motor está em uso\n"
             "[cyan]/chaves[/cyan]    status das chaves (só motor gemini)\n"
             "[cyan]/memoria[/cyan]   mostra o que o JARVIS já lembra\n"
+            "[cyan]/novo[/cyan]      começa uma conversa nova (esquece o contexto atual)\n"
             "[cyan]/limpar[/cyan]    limpa a tela\n"
             "[cyan]/sair[/cyan]      encerra",
             title="comandos", border_style="grey37", padding=(0, 2)))
+        return True
+    if cmd in ("/novo", "/reset"):
+        historico.clear()
+        console.print("  [dim]🧹 conversa reiniciada — contexto anterior esquecido.[/dim]")
         return True
     if cmd in ("/memoria", "/memorias"):
         console.print(Panel(ferramentas.memoria_listar(),
@@ -307,10 +329,12 @@ def main() -> None:
     motor_chamar, pool, rotulo = _preparar_motor()
     banner(rotulo, len(ferramentas.carregar_memorias()))
 
+    historico: list = []   # conversa viva; persiste entre turnos do REPL
+
     arg = " ".join(sys.argv[1:]).strip()
     if arg:  # modo one-shot
         try:
-            resposta = rodar(motor_chamar, arg)
+            resposta = rodar(motor_chamar, historico, arg)
         except Exception as e:  # noqa: BLE001
             console.print(f"[red]erro:[/red] {e}")
             sys.exit(1)
@@ -328,9 +352,9 @@ def main() -> None:
         if not entrada:
             continue
         try:
-            if _comando_especial(pool, entrada):
+            if _comando_especial(pool, historico, entrada):
                 continue
-            resposta = rodar(motor_chamar, entrada)
+            resposta = rodar(motor_chamar, historico, entrada)
             console.print()
             console.print(Panel(Markdown(resposta),
                                 title=f"[green]{config.NOME}", border_style="green", padding=(1, 2)))

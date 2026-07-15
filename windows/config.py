@@ -45,6 +45,11 @@ TEMPERATURA = 0.3
 TIMEOUT = 60          # segundos por request
 MAX_ITER = 10         # trava anti-loop do ReAct
 
+# --- Contexto da conversa: orçamento (em caracteres) da janela de histórico
+# enviada ao modelo a cada turno. Mantém as mensagens mais RECENTES dentro do
+# limite pra não estourar o contexto do modelo (o local roda com -c 4096). ---
+CONTEXTO_MAX_CHARS = int(os.environ.get("JARVIS_CONTEXTO_MAX_CHARS", "12000"))
+
 # --- Sandbox de arquivos: o agente só mexe aqui (configurável por env) ---
 WORKSPACE = os.environ.get("AGENTE_WORKSPACE", os.path.join(BASE, "workspace"))
 DADOS = os.environ.get("AGENTE_DADOS", os.path.join(BASE, "dados"))
