@@ -24,6 +24,19 @@ def _dentro(base: str, caminho: str) -> str:
     return alvo
 
 
+def _resolver_alvo(caminho: str) -> str:
+    """Resolve o caminho de ESCRITA de uma ferramenta. Expande `~` e aceita
+    caminho absoluto (pode escrever fora do REPO); relativo é resolvido contra
+    REPO. Sempre retorna caminho absoluto normalizado. A barreira é o gate
+    humano 🟡 + trinco (permissao.py), não este helper."""
+    if not caminho or not str(caminho).strip():
+        raise ValueError("caminho vazio")
+    expandido = os.path.expanduser(str(caminho))
+    if os.path.isabs(expandido):
+        return os.path.normpath(expandido)
+    return os.path.normpath(os.path.join(config.REPO, expandido))
+
+
 def _garantir() -> None:
     os.makedirs(config.DADOS, exist_ok=True)
 
@@ -51,14 +64,17 @@ def ler_arquivo(caminho: str, inicio: int = None, fim: int = None) -> str:
 
 
 def escrever_arquivo(caminho: str, conteudo: str) -> str:
-    """Cria/sobrescreve um arquivo no PROJETO. Passa pelo trinco de aprovação."""
+    """Cria/sobrescreve um arquivo. Aceita caminho relativo (contra o projeto)
+    ou absoluto (`~/Downloads/...`, `/tmp/...`). Passa pelo trinco de aprovação."""
     if not permissao.consumir(permissao.comando_de("escrever_arquivo", {"caminho": caminho})):
         return "ERRO: escrita não passou pela aprovação de risco (trinco de segurança)."
-    alvo = _dentro(config.REPO, caminho)
-    os.makedirs(os.path.dirname(alvo) or config.REPO, exist_ok=True)
+    alvo = _resolver_alvo(caminho)
+    pasta = os.path.dirname(alvo)
+    if pasta:
+        os.makedirs(pasta, exist_ok=True)
     with open(alvo, "w", encoding="utf-8") as f:
         f.write(conteudo)
-    return f"OK: {len(conteudo)} caracteres gravados em {caminho}"
+    return f"OK: {len(conteudo)} caracteres gravados em {alvo}"
 
 
 def listar_diretorio(caminho: str = ".", recursivo: bool = False) -> str:
@@ -182,32 +198,38 @@ def git(args: str = "") -> str:
 
 
 def editar_arquivo(caminho: str, procurar: str, substituir: str) -> str:
-    """Busca-e-substitui num arquivo do PROJETO. Passa pelo trinco de aprovação."""
+    """Busca-e-substitui num arquivo (relativo ao projeto ou absoluto). Passa
+    pelo trinco de aprovação."""
     if not permissao.consumir(permissao.comando_de("editar_arquivo", {"caminho": caminho})):
         return "ERRO: edição não passou pela aprovação de risco (trinco de segurança)."
-    alvo = _dentro(config.REPO, caminho)
+    alvo = _resolver_alvo(caminho)
     if not os.path.isfile(alvo):
-        return f"ERRO: arquivo não existe: {caminho}"
+        return f"ERRO: arquivo não existe: {alvo}"
     with open(alvo, "r", encoding="utf-8", errors="replace") as f:
         texto = f.read()
     if procurar not in texto:
-        return f"ERRO: trecho a procurar não encontrado em {caminho}"
+        return f"ERRO: trecho a procurar não encontrado em {alvo}"
     n = texto.count(procurar)
     with open(alvo, "w", encoding="utf-8") as f:
         f.write(texto.replace(procurar, substituir))
-    return f"OK: {n} ocorrência(s) substituída(s) em {caminho}"
+    return f"OK: {n} ocorrência(s) substituída(s) em {alvo}"
 
 
 def criar_planilha(nome: str, dados: list, cabecalho: list = None) -> str:
-    """Cria uma planilha Excel (.xlsx). `dados` = lista de linhas (listas) ou
-    lista de dicionários. `cabecalho` opcional (lista de colunas)."""
+    """Cria uma planilha Excel (.xlsx). `nome` pode ser relativo ao projeto ou
+    absoluto (`~/Downloads/x.xlsx`, `/tmp/y.xlsx`). `dados` = lista de linhas
+    (listas) ou lista de dicionários. `cabecalho` opcional (lista de colunas)."""
+    if not permissao.consumir(permissao.comando_de("criar_planilha", {"nome": nome})):
+        return "ERRO: criação de planilha não passou pela aprovação de risco (trinco de segurança)."
     from openpyxl import Workbook
     from openpyxl.styles import Font
 
     if not nome.lower().endswith(".xlsx"):
         nome += ".xlsx"
-    alvo = _dentro(config.REPO, nome)
-    os.makedirs(os.path.dirname(alvo) or config.REPO, exist_ok=True)
+    alvo = _resolver_alvo(nome)
+    pasta = os.path.dirname(alvo)
+    if pasta:
+        os.makedirs(pasta, exist_ok=True)
 
     wb = Workbook()
     ws = wb.active
@@ -236,12 +258,16 @@ def criar_planilha(nome: str, dados: list, cabecalho: list = None) -> str:
         ws.column_dimensions[col[0].column_letter].width = min(largura + 2, 60)
 
     wb.save(alvo)
-    return f"OK: planilha {nome} criada ({ws.max_row} linhas x {ws.max_column} colunas)"
+    return f"OK: planilha criada em {alvo} ({ws.max_row} linhas x {ws.max_column} colunas)"
 
 
 def criar_pdf(nome: str, titulo: str = None, conteudo=None, tabela: list = None) -> str:
-    """Cria um PDF. `titulo` (opcional), `conteudo` (texto ou lista de parágrafos),
-    `tabela` (opcional: lista de linhas, a 1ª vira cabeçalho)."""
+    """Cria um PDF. `nome` pode ser relativo ao projeto ou absoluto
+    (`~/Downloads/x.pdf`, `/tmp/y.pdf`). `titulo` (opcional), `conteudo` (texto
+    ou lista de parágrafos), `tabela` (opcional: lista de linhas, a 1ª vira
+    cabeçalho)."""
+    if not permissao.consumir(permissao.comando_de("criar_pdf", {"nome": nome})):
+        return "ERRO: criação de PDF não passou pela aprovação de risco (trinco de segurança)."
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet
@@ -250,8 +276,10 @@ def criar_pdf(nome: str, titulo: str = None, conteudo=None, tabela: list = None)
 
     if not nome.lower().endswith(".pdf"):
         nome += ".pdf"
-    alvo = _dentro(config.REPO, nome)
-    os.makedirs(os.path.dirname(alvo) or config.REPO, exist_ok=True)
+    alvo = _resolver_alvo(nome)
+    pasta = os.path.dirname(alvo)
+    if pasta:
+        os.makedirs(pasta, exist_ok=True)
 
     estilos = getSampleStyleSheet()
     flow = []
@@ -277,7 +305,7 @@ def criar_pdf(nome: str, titulo: str = None, conteudo=None, tabela: list = None)
         flow.append(t)
 
     SimpleDocTemplate(alvo, pagesize=A4).build(flow)
-    return f"OK: PDF {nome} criado"
+    return f"OK: PDF criado em {alvo}"
 
 
 def _fmt_cve(cve: dict) -> str:

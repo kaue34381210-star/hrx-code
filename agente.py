@@ -31,12 +31,12 @@ Ferramentas de arquivo (agem no PROJETO real, com números de linha):
 - listar_diretorio(caminho, recursivo)  lista arquivos ("." = raiz do projeto); recursivo=True mostra a árvore
 - buscar_codigo(padrao, caminho, ext)  procura texto/regex nos arquivos (tipo grep -rn); ex: buscar_codigo("def main", ext=".py")
 - ler_arquivo(caminho, inicio, fim)    lê o arquivo; inicio/fim = intervalo de linhas (1-based), opcional
-- escrever_arquivo(caminho, conteudo)  cria/sobrescreve um arquivo
-- editar_arquivo(caminho, procurar, substituir)  busca-e-substitui exato num arquivo existente
+- escrever_arquivo(caminho, conteudo)  cria/sobrescreve um arquivo (aceita caminho relativo OU absoluto: `~/Downloads/x.txt`, `/tmp/y.log`)
+- editar_arquivo(caminho, procurar, substituir)  busca-e-substitui exato num arquivo existente (mesmo esquema de caminho)
 
 Outras ferramentas:
-- criar_planilha(nome, dados, cabecalho)  cria Excel .xlsx
-- criar_pdf(nome, titulo, conteudo, tabela)  cria PDF
+- criar_planilha(nome, dados, cabecalho)  cria Excel .xlsx (`nome` aceita path relativo ao projeto ou absoluto, ex: `~/Downloads/lista.xlsx`)
+- criar_pdf(nome, titulo, conteudo, tabela)  cria PDF (mesmo esquema de caminho)
 - rodar_comando(comando)        executa comando no shell (roda no diretório do projeto)
 - git(args)                     versiona: git("status"), git("diff"), git("commit -m 'msg'")
 - consultar_cve(consulta)       consulta CVEs no NVD por ID (CVE-2021-44228) ou palavra-chave

@@ -24,11 +24,15 @@ COMANDO_DE_FERRAMENTA = {
     "git": lambda a: ("git " + str((a or {}).get("args", ""))).strip(),
     "escrever_arquivo": lambda a: f"escrever_arquivo {(a or {}).get('caminho', '')}".strip(),
     "editar_arquivo": lambda a: f"editar_arquivo {(a or {}).get('caminho', '')}".strip(),
+    "criar_planilha": lambda a: f"criar_planilha {(a or {}).get('nome', '')}".strip(),
+    "criar_pdf": lambda a: f"criar_pdf {(a or {}).get('nome', '')}".strip(),
 }
 
-# Ferramentas de ESCRITA no projeto: risco fixo 🟡 (não são comando de shell,
-# então não passam por aprovacao.classificar; escrevem/sobrescrevem arquivo).
-FERRAMENTAS_ESCRITA = {"escrever_arquivo", "editar_arquivo"}
+# Ferramentas de ESCRITA: risco fixo 🟡 (não são comando de shell, então não
+# passam por aprovacao.classificar; escrevem/sobrescrevem arquivo). Aceitam
+# caminho absoluto — o gate humano é a barreira, não o path.
+FERRAMENTAS_ESCRITA = {"escrever_arquivo", "editar_arquivo",
+                       "criar_planilha", "criar_pdf"}
 
 MODOS = ("blindado", "cauteloso", "auto")   # do mais rígido ao mais solto
 
