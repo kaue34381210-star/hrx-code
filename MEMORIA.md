@@ -6,6 +6,9 @@ comportamento, os comandos ou a configuração mudarem.
 
 ## Mudanças recentes
 
+- Testes avulsos migrados para uma suíte `pytest`, com execução automática no
+  GitHub Actions em Python 3.10 a 3.13 e dependências declaradas em arquivos
+  `requirements`.
 - Projeto renomeado de "JARVIS" para **HRX CODE** (evitar direitos autorais da
   Marvel). Trocado tudo: marca, logo ASCII, backronym, config dir
   (`~/.config/hrx/`), prefixo de env vars (`HRX_`) e comandos (`hrx`,

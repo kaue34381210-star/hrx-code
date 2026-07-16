@@ -34,7 +34,7 @@ Python 3.10+.
 git clone https://github.com/kaue34381210-star/hrx-code.git
 cd hrx-code
 python -m venv .venv && . .venv/bin/activate
-pip install rich requests openpyxl reportlab
+pip install -r requirements.txt
 ```
 
 ### Chaves
@@ -98,18 +98,16 @@ claude.py        adaptador para a API Messages da Anthropic
 iniciar-qwen.sh  inicia o llamafile com o modelo GGUF
 ferramentas.py   ferramentas sandboxed
 config.py        configuração
-teste_failover.py  simula o failover sem gastar quota
+tests/            suíte automatizada com pytest
 ```
 
-Teste o failover sem consumir API:
+Instale as dependências de desenvolvimento e rode a suíte completa:
 ```bash
-python teste_failover.py
+pip install -r requirements-dev.txt
+python -m pytest
 ```
 
-Teste o adaptador local sem carregar o modelo:
-```bash
-python teste_local.py
-```
+Os mesmos testes rodam no GitHub Actions em Python 3.10, 3.11, 3.12 e 3.13.
 
 ## Segurança
 

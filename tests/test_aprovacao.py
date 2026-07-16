@@ -1,11 +1,9 @@
-"""Testes do classificador de risco (aprovação inteligente 🟢🟡🔴).
+import pytest
 
-Rode: python teste_aprovacao.py
-"""
 import aprovacao
 
+
 CASOS = [
-    # (comando, nível esperado)
     ("ls -la", "verde"),
     ("pwd", "verde"),
     ("cat notas.txt", "verde"),
@@ -13,14 +11,13 @@ CASOS = [
     ("git status", "verde"),
     ("git diff HEAD~1", "verde"),
     ("git log --oneline", "verde"),
-
     ("mkdir build", "amarelo"),
     ("cp a.txt b.txt", "amarelo"),
     ("git commit -m 'x'", "amarelo"),
     ("git push origin main", "amarelo"),
-    ("git log --output=/tmp/x", "amarelo"),   # flag smuggling → não pode ser 🟢
-    ("git -c core.pager=!sh log", "amarelo"),  # config injection
-    ("git diff --ext-diff", "amarelo"),        # diff externo
+    ("git log --output=/tmp/x", "amarelo"),
+    ("git -c core.pager=!sh log", "amarelo"),
+    ("git diff --ext-diff", "amarelo"),
     ("pip install requests", "amarelo"),
     ("npm install", "amarelo"),
     ("sed -i 's/a/b/' f.txt", "amarelo"),
@@ -30,7 +27,6 @@ CASOS = [
     ("python3 script.py", "amarelo"),
     ("nmap -sV scanme.nmap.org", "amarelo"),
     ("comando_que_nao_existe --x", "amarelo"),
-
     ("rm -rf build", "vermelho"),
     ("rm arquivo.txt", "vermelho"),
     ("sudo apt install nginx", "vermelho"),
@@ -48,22 +44,8 @@ CASOS = [
 ]
 
 
-def main() -> int:
-    falhas = 0
-    for comando, esperado in CASOS:
-        nivel, motivo = aprovacao.classificar(comando)
-        ok = nivel == esperado
-        sinal = "✓" if ok else "✗"
-        if not ok:
-            falhas += 1
-        icone = {"verde": "🟢", "amarelo": "🟡", "vermelho": "🔴"}[nivel]
-        print(f"  {sinal} {icone} {nivel:<9} {comando!r:<40} ({motivo})"
-              + ("" if ok else f"   ← esperava {esperado}"))
+@pytest.mark.parametrize(("comando", "esperado"), CASOS)
+def test_classifica_risco(comando, esperado):
+    nivel, _ = aprovacao.classificar(comando)
 
-    total = len(CASOS)
-    print(f"\n{total - falhas}/{total} ok" + (" ✅" if not falhas else f" — {falhas} falha(s) ❌"))
-    return 1 if falhas else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    assert nivel == esperado
