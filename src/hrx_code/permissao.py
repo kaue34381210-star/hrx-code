@@ -54,10 +54,11 @@ def assinatura(comando: str) -> str:
 class Politica:
     """Estado de permissões de uma sessão."""
 
-    def __init__(self, modo: str = None, seguros_extra=()):
+    def __init__(self, modo: str = None, seguros_extra=(), dry_run: bool = False):
         modo = (modo or "cauteloso").strip().lower()
         self.modo = modo if modo in MODOS else "cauteloso"
         self.seguros_extra = set(seguros_extra)
+        self.dry_run = bool(dry_run)
         self.sempre = set()
         self._trinco = None
 

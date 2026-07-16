@@ -25,6 +25,7 @@ CASOS = [
     ("systemctl restart nginx", "amarelo"),
     ("docker build -t app .", "amarelo"),
     ("python3 script.py", "amarelo"),
+    ("echo ok && comando_que_nao_existe", "amarelo"),
     ("nmap -sV scanme.nmap.org", "amarelo"),
     ("comando_que_nao_existe --x", "amarelo"),
     ("rm -rf build", "vermelho"),
@@ -39,8 +40,20 @@ CASOS = [
     ("chmod -R 777 /", "vermelho"),
     ("killall python", "vermelho"),
     ("find . -name '*.log' -delete", "vermelho"),
+    ("r''m -rf build", "vermelho"),
+    (r"r\m -rf build", "vermelho"),
+    ("bash -c 'echo aparentemente seguro'", "vermelho"),
+    ("python3.11 -c 'print(1)'", "vermelho"),
+    ("node --eval 'console.log(1)'", "vermelho"),
+    ("pwsh -EncodedCommand ZQBjAGgAbwA=", "vermelho"),
+    ("$COMANDO --flag", "vermelho"),
+    ("env COMANDO=ls $COMANDO", "vermelho"),
+    ("DEL arquivo.txt", "vermelho"),
+    ("echo 'aspas sem fechar", "vermelho"),
     (":(){ :|:& };:", "vermelho"),
     ("", "vermelho"),
+    ("echo ok | cat", "verde"),
+    ("echo $HOME", "verde"),
 ]
 
 

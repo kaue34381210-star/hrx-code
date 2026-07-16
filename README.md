@@ -124,8 +124,9 @@ resposta final.
 - Comandos customizados por arquivos Markdown em `~/.config/hrx/comandos/`.
 - Perfis configuráveis com nome, tom, idioma e projeto atual.
 
-Comandos úteis no chat: `/config`, `/perfil`, `/motor`, `/modo`, `/permissoes`,
-`/memoria`, `/comandos`, `/debug`, `/resumo`, `/novo`, `/ajuda` e `/sair`.
+Comandos úteis no chat: `/config`, `/perfil`, `/motor`, `/modo`, `/dry-run`,
+`/permissoes`, `/memoria`, `/comandos`, `/debug`, `/resumo`, `/novo`, `/ajuda`
+e `/sair`.
 
 ## Segurança
 
@@ -135,8 +136,13 @@ Comandos úteis no chat: `/config`, `/perfil`, `/motor`, `/modo`, `/permissoes`,
   modo automático.
 - Comandos são classificados como verde, amarelo ou vermelho; riscos vermelhos
   nunca são rebaixados por uma permissão anterior.
+- O classificador normaliza sintaxe shell para detectar comandos ofuscados,
+  executores dinâmicos, cadeias e código inline.
 - Ferramentas sensíveis exigem uma autorização de uso único correspondente ao
   comando aprovado.
+- O modo `/dry-run on` mantém leituras ativas, mas apenas classifica e descreve
+  ferramentas sensíveis sem executá-las. Também pode iniciar ativo com
+  `HRX_DRY_RUN=1`.
 - URLs resolvem todos os endereços IPv4 e IPv6 e bloqueiam redes privadas,
   loopback, link-local, multicast e endereços reservados.
 - Chaves e preferências ficam em arquivos de configuração fora do pacote e com
@@ -152,7 +158,7 @@ python -m pip install -e ".[dev]"
 python -m pytest
 ```
 
-A suíte possui 77 testes, cobre atualmente 42% do pacote e roda no GitHub
+A suíte possui 94 testes, cobre atualmente 48% do pacote e roda no GitHub
 Actions com Python 3.10, 3.11, 3.12 e 3.13. O CI exige no mínimo 40% de
 cobertura. Para recriar a demonstração do README, instale o FFmpeg e execute:
 

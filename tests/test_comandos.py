@@ -25,6 +25,7 @@ def test_carrega_frontmatter_e_ignora_reservados(pasta_comandos):
     assert set(carregados) == {"/revisar"}
     assert carregados["/revisar"]["descricao"] == "Revisa o projeto"
     assert carregados["/revisar"]["corpo"] == "Analise o código."
+    assert "/dry-run" in comandos.BUILTIN
 
 
 def test_expande_argumentos_e_anexa_quando_nao_ha_placeholder(pasta_comandos):

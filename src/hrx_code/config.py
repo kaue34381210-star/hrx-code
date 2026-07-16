@@ -185,3 +185,6 @@ COMANDOS_PERMITIDOS = {
 TIMEOUT_COMANDO = 30
 
 MODO = os.environ.get("HRX_MODO", "cauteloso").strip().lower()
+DRY_RUN = os.environ.get("HRX_DRY_RUN", "").strip().lower() in {
+    "1", "true", "sim", "yes", "on",
+}

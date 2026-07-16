@@ -231,6 +231,18 @@ def _aprovar_comando(pol: permissao.Politica, comando: str,
     return True, None
 
 
+def _simular_comando(pol: permissao.Politica, nome: str, comando: str,
+                     args: dict = None) -> str:
+    nivel, motivo = pol.classificar(comando, ferramenta=nome, args=args)
+    console.print(
+        f"  [cyan]◌ dry-run[/cyan] [dim]— {nivel}: {motivo}; não executado[/dim]"
+    )
+    return (
+        f"DRY-RUN: a ferramenta {nome} não foi executada. "
+        f"Classificação prevista: {nivel} ({motivo})."
+    )
+
+
 def _janela(historico: list) -> list:
     """Mantém as mensagens recentes dentro do orçamento de contexto."""
     orcamento = config.CONTEXTO_MAX_CHARS
@@ -303,6 +315,7 @@ def _debug_estado(pool, pol: permissao.Politica, historico: list) -> str:
         f"idioma: {getattr(config, 'IDIOMA', '?')}",
         f"projeto: {getattr(config, 'PROJETO', '') or '(vazio)'}",
         f"modo de permissões: {pol.modo}",
+        f"dry-run: {'ativado' if pol.dry_run else 'desativado'}",
         f"sempre permitidos: {len(pol.sempre)}",
         f"mensagens na conversa: {len(historico)}",
         f"memórias salvas: {len(memoria)}",
@@ -333,13 +346,16 @@ def rodar(motor_chamar, pol: permissao.Politica, historico: list, pergunta: str)
         console.print(f"  [grey50]⚙ {nome}([/grey50][grey62]{_fmt_args(args)}[/grey62][grey50])[/grey50]")
         if permissao.exige_aprovacao(nome):
             comando = permissao.comando_de(nome, args)
-            permitido, bloqueio = _aprovar_comando(
-                pol, comando, ferramenta=nome, args=args)
-            if permitido:
-                pol.liberar(comando)
-                resultado = ferramentas.executar(nome, args)
+            if pol.dry_run:
+                resultado = _simular_comando(pol, nome, comando, args)
             else:
-                resultado = bloqueio
+                permitido, bloqueio = _aprovar_comando(
+                    pol, comando, ferramenta=nome, args=args)
+                if permitido:
+                    pol.liberar(comando)
+                    resultado = ferramentas.executar(nome, args)
+                else:
+                    resultado = bloqueio
         else:
             resultado = ferramentas.executar(nome, args)
         historico.append({"role": "user",
@@ -508,6 +524,7 @@ def _comando_especial(motor_chamar, pool, pol: permissao.Politica, historico: li
             "[cyan]/debug[/cyan]       mostra o estado interno do agente\n"
             "[cyan]/resumo[/cyan]      resume a conversa atual\n"
             "[cyan]/modo[/cyan] [dim]<m>[/dim]   permissões: [dim]blindado · cauteloso · auto[/dim]\n"
+            "[cyan]/dry-run[/cyan] [dim]<on|off>[/dim] simula ferramentas sensíveis\n"
             "[cyan]/permissoes[/cyan]  mostra modo e a lista 'sempre permitir'\n"
             "[cyan]/memoria[/cyan]     mostra o que o HRX CODE já lembra\n"
             "[cyan]/memoria modo[/cyan] mostra/troca o modo da memória\n"
@@ -567,10 +584,27 @@ def _comando_especial(motor_chamar, pool, pol: permissao.Politica, historico: li
             console.print("  [dim]blindado=pergunta tudo · cauteloso=🟡🔴 · "
                           "auto=só 🔴[/dim]")
         return True
+    if partes and partes[0] in ("/dry-run", "/dryrun", "/simular"):
+        if len(partes) == 1:
+            estado = "ativado" if pol.dry_run else "desativado"
+            console.print(f"  dry-run: [cyan]{estado}[/cyan]")
+            return True
+        valor = partes[1]
+        if valor in ("on", "1", "sim", "yes", "ativar", "ativado"):
+            pol.dry_run = True
+            console.print("  [green]✓[/green] dry-run [cyan]ativado[/cyan]")
+        elif valor in ("off", "0", "nao", "não", "no", "desativar", "desativado"):
+            pol.dry_run = False
+            console.print("  [green]✓[/green] dry-run [cyan]desativado[/cyan]")
+        else:
+            console.print("  [red]valor inválido[/red] — use: /dry-run on|off")
+        return True
     if cmd in ("/permissoes", "/permissões", "/perm"):
         sempre = ", ".join(sorted(pol.sempre)) if pol.sempre else "(nenhum)"
+        dry_run = "ativado" if pol.dry_run else "desativado"
         console.print(Panel(
             f"modo: [cyan]{pol.modo}[/cyan]\n"
+            f"dry-run: [cyan]{dry_run}[/cyan]\n"
             f"sempre permitir: [green]{sempre}[/green]",
             title="🔐 permissões", border_style="grey37", padding=(0, 2)))
         return True
@@ -756,8 +790,11 @@ def main() -> None:
     motor_chamar, pool, rotulo = _preparar_motor()
     banner(rotulo, len(ferramentas.carregar_memorias()))
 
-    pol = permissao.Politica(modo=getattr(config, "MODO", "cauteloso"),
-                             seguros_extra=getattr(config, "COMANDOS_PERMITIDOS", ()))
+    pol = permissao.Politica(
+        modo=getattr(config, "MODO", "cauteloso"),
+        seguros_extra=getattr(config, "COMANDOS_PERMITIDOS", ()),
+        dry_run=getattr(config, "DRY_RUN", False),
+    )
     permissao.usar(pol)
 
     historico: list = []

@@ -1,6 +1,7 @@
 """Classificação heurística de risco para comandos."""
 import os
 import re
+import shlex
 
 # Padrões perigosos são avaliados antes destas listas.
 SEGUROS = {
@@ -62,6 +63,10 @@ VERMELHO = [
     (re.compile(r"\bmv\b.+\s/(etc|bin|sbin|usr|var|boot|lib)\b"), "move para diretório de sistema"),
     (re.compile(r"\b(iptables|nft|ufw)\b"), "altera regras de firewall"),
     (re.compile(r"\bcrontab\b\s+-r"), "apaga todas as tarefas agendadas"),
+    (re.compile(r"\b(del|erase)\b"), "remove arquivos no Windows"),
+    (re.compile(r"\b(rd|remove-item)\b.+(-r\b|-recurse\b|/s\b)"), "remove diretórios recursivamente"),
+    (re.compile(r"\b(format|diskpart)\b"), "mexe no disco no Windows"),
+    (re.compile(r"\b(stop-computer|restart-computer)\b"), "desliga/reinicia a máquina"),
 ]
 
 AMARELO = [
@@ -79,7 +84,8 @@ MUTANTES = {
     "yum", "pacman", "brew", "pip", "pip3", "pipx", "npm", "pnpm", "yarn",
     "cargo", "go", "docker", "podman", "kubectl", "systemctl", "service",
     "python", "python3", "node", "bash", "sh", "zsh", "perl", "ruby", "sed",
-    "awk", "nmap", "curl", "wget", "ssh", "scp", "rsync",
+    "awk", "nmap", "curl", "wget", "ssh", "scp", "rsync", "powershell",
+    "pwsh", "cmd", "dash", "ksh", "fish", "php", "deno", "bun",
 }
 
 # Flags que permitem a um git de leitura escrever arquivos ou executar código.
@@ -89,12 +95,82 @@ GIT_FLAGS_SENSIVEIS = re.compile(
 
 NIVEIS = ("verde", "amarelo", "vermelho")
 
+_SEPARADORES = {";", "&&", "||", "|", "&", "(", ")"}
+_WRAPPERS = {"command", "env", "nohup"}
+_ATRIBUICAO = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_PYTHON = re.compile(r"^python(?:\d+(?:\.\d+)*)?$")
+_INLINE = {
+    "bash": {"-c", "--command"},
+    "dash": {"-c"},
+    "sh": {"-c"},
+    "zsh": {"-c"},
+    "ksh": {"-c"},
+    "fish": {"-c", "--command"},
+    "node": {"-e", "--eval"},
+    "deno": {"eval"},
+    "bun": {"-e", "--eval"},
+    "perl": {"-e"},
+    "ruby": {"-e"},
+    "php": {"-r"},
+    "powershell": {"-c", "-command", "-enc", "-encodedcommand"},
+    "pwsh": {"-c", "-command", "-enc", "-encodedcommand"},
+    "cmd": {"/c", "/k"},
+}
 
-def _executavel(comando: str) -> str:
-    partes = comando.strip().split()
-    if not partes:
-        return ""
-    return os.path.basename(partes[0]).lower()
+
+def _tokenizar(comando: str) -> list:
+    lexer = shlex.shlex(comando, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    return list(lexer)
+
+
+def _segmentos(tokens: list) -> list:
+    segmentos, atual = [], []
+    for token in tokens:
+        if token in _SEPARADORES:
+            if atual:
+                segmentos.append(atual)
+                atual = []
+        else:
+            atual.append(token)
+    if atual:
+        segmentos.append(atual)
+    return segmentos
+
+
+def _comando_do_segmento(tokens: list) -> tuple:
+    """Retorna executável e argumentos, atravessando wrappers simples."""
+    for indice, token in enumerate(tokens):
+        if _ATRIBUICAO.match(token) or token.startswith((">", "<")):
+            continue
+        exe = os.path.basename(token).lower()
+        if exe in _WRAPPERS:
+            continue
+        if token.startswith("-"):
+            continue
+        return token, [t.lower() for t in tokens[indice + 1:]]
+    return "", []
+
+
+def _risco_estrutural(tokens: list) -> tuple:
+    comandos = []
+    for segmento in _segmentos(tokens):
+        bruto, args = _comando_do_segmento(segmento)
+        if not bruto:
+            continue
+        if "$" in bruto or "`" in bruto:
+            return "vermelho", "executável definido dinamicamente"
+        exe = os.path.basename(bruto).lower()
+        comandos.append(exe)
+        flags = set(args)
+        if _PYTHON.match(exe) and "-c" in flags:
+            return "vermelho", "executa código Python inline"
+        if exe in _INLINE and flags.intersection(_INLINE[exe]):
+            return "vermelho", f"executa código inline via {exe}"
+        if exe in {"eval", "source", "."}:
+            return "vermelho", "executa conteúdo dinâmico no shell"
+    return "", comandos
 
 
 def classificar(comando: str, seguros_extra=()) -> tuple:
@@ -103,20 +179,38 @@ def classificar(comando: str, seguros_extra=()) -> tuple:
     if not c:
         return ("vermelho", "comando vazio")
 
+    try:
+        tokens = _tokenizar(c)
+    except ValueError:
+        return ("vermelho", "sintaxe shell inválida")
+
+    estrutural, detalhe = _risco_estrutural(tokens)
+    if estrutural:
+        return estrutural, detalhe
+
+    normalizado = " ".join(tokens).lower()
+    candidatos = (c.lower(), normalizado)
+
     for rx, motivo in VERMELHO:
-        if rx.search(c):
+        if any(rx.search(valor) for valor in candidatos):
             return ("vermelho", motivo)
 
     for rx, motivo in AMARELO:
-        if rx.search(c):
+        if any(rx.search(valor) for valor in candidatos):
             return ("amarelo", motivo)
 
-    exe = _executavel(c)
+    comandos = detalhe
+    exe = comandos[0] if comandos else ""
+    seguros = SEGUROS | set(seguros_extra)
+
+    for encadeado in comandos[1:]:
+        if encadeado not in seguros:
+            return ("amarelo", f"encadeia comando não seguro ({encadeado})")
 
     if exe == "git":
-        if GIT_FLAGS_SENSIVEIS.search(c):
+        if GIT_FLAGS_SENSIVEIS.search(normalizado):
             return ("amarelo", "git com flag sensível")
-        sub = (c.split()[1].lower() if len(c.split()) > 1 else "")
+        sub = (tokens[1].lower() if len(tokens) > 1 else "")
         if sub in {"status", "diff", "log", "show", "branch", "remote",
                    "fetch", "rev-parse", "describe", "blame", "ls-files",
                    "shortlog", "reflog", "config", "tag", "cat-file", ""}:
@@ -124,12 +218,11 @@ def classificar(comando: str, seguros_extra=()) -> tuple:
         return ("amarelo", "altera o repositório git")
 
     if exe in LEITURA_POR_SUB:
-        partes = c.split()
-        sub = partes[1].lower() if len(partes) > 1 else ""
+        sub = tokens[1].lower() if len(tokens) > 1 else ""
         if sub in LEITURA_POR_SUB[exe]:
             return ("verde", f"{exe} {sub} (leitura)")
 
-    if exe in SEGUROS or exe in set(seguros_extra):
+    if exe in seguros:
         return ("verde", "somente leitura")
 
     if exe in MUTANTES:

@@ -9,6 +9,7 @@ BUILTIN = frozenset({
     "/sair", "/quit", "/exit", "/ajuda", "/help",
     "/config", "/perfil", "/debug", "/novo", "/reset",
     "/modo", "/permissoes", "/permissões", "/perm",
+    "/dry-run", "/dryrun", "/simular",
     "/memoria", "/memorias", "/motor", "/chaves", "/limpar",
     "/comandos", "/resumo",
 })

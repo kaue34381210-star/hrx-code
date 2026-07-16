@@ -74,3 +74,8 @@ def test_caminho_vazio_e_alto_risco(projeto):
 
     assert nivel == "vermelho"
     assert motivo == "caminho de escrita inválido"
+
+
+def test_dry_run_fica_desativado_por_padrao_e_pode_ser_ativado():
+    assert permissao.Politica().dry_run is False
+    assert permissao.Politica(dry_run=True).dry_run is True
