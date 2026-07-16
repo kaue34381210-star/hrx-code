@@ -16,6 +16,8 @@ executor; ambos importam ESTE módulo, que é a fonte única da verdade.
 import os
 
 import aprovacao
+import caminhos
+import config
 
 # Ferramentas que exigem aprovação e como derivar, dos args do modelo, a string
 # de comando que será classificada/liberada. Fonte única p/ agente e ferramentas.
@@ -28,11 +30,16 @@ COMANDO_DE_FERRAMENTA = {
     "criar_pdf": lambda a: f"criar_pdf {(a or {}).get('nome', '')}".strip(),
 }
 
-# Ferramentas de ESCRITA: risco fixo 🟡 (não são comando de shell, então não
-# passam por aprovacao.classificar; escrevem/sobrescrevem arquivo). Aceitam
-# caminho absoluto — o gate humano é a barreira, não o path.
+# Ferramentas de ESCRITA: dentro do projeto são 🟡; fora dele são sempre 🔴.
 FERRAMENTAS_ESCRITA = {"escrever_arquivo", "editar_arquivo",
                        "criar_planilha", "criar_pdf"}
+
+CAMPO_CAMINHO = {
+    "escrever_arquivo": "caminho",
+    "editar_arquivo": "caminho",
+    "criar_planilha": "nome",
+    "criar_pdf": "nome",
+}
 
 MODOS = ("blindado", "cauteloso", "auto")   # do mais rígido ao mais solto
 
@@ -74,13 +81,23 @@ class Politica:
         self.sempre = set()       # assinaturas liberadas p/ a sessão inteira
         self._trinco = None       # token de uso único p/ a próxima ferramenta
 
-    def classificar(self, comando: str, ferramenta: str = None):
+    def classificar(self, comando: str, ferramenta: str = None, args: dict = None):
         """(nivel, motivo) já ajustado pelo modo e pela lista 'sempre'.
         REGRA DE SEGURANÇA: 🔴 nunca é rebaixado — nem por 'sempre', nem por
         modo auto. A assinatura casa 2 tokens, então um 'git commit' liberado
         JAMAIS pode arrastar um 'git commit ... && rm -rf' (que é 🔴).
-        `ferramenta` de escrita de arquivo entra fixa em 🟡 (não é shell)."""
+        Escritas fora do projeto entram em 🔴, inclusive escapes por ``..`` ou
+        links simbólicos, e nunca são rebaixadas pelo modo da sessão."""
         if ferramenta in FERRAMENTAS_ESCRITA:
+            campo = CAMPO_CAMINHO[ferramenta]
+            informado = str((args or {}).get(campo, ""))
+            try:
+                alvo = caminhos.resolver(config.REPO, informado)
+                interno = caminhos.esta_dentro(config.REPO, alvo)
+            except ValueError:
+                return "vermelho", "caminho de escrita inválido"
+            if not interno:
+                return "vermelho", f"escreve fora do projeto: {alvo}"
             nivel, motivo = "amarelo", "escreve/sobrescreve arquivo no projeto"
         else:
             nivel, motivo = aprovacao.classificar(comando, seguros_extra=self.seguros_extra)

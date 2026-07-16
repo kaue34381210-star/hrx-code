@@ -184,7 +184,7 @@ MAX_ITER = int(os.environ.get("HRX_MAX_ITER", "20"))  # passos do ReAct (código
 # limite pra não estourar o contexto do modelo (o local roda com -c 4096). ---
 CONTEXTO_MAX_CHARS = int(os.environ.get("HRX_CONTEXTO_MAX_CHARS", "12000"))
 
-# --- Sandbox de arquivos: o agente só mexe aqui (configurável por env) ---
+# --- Áreas internas para artefatos e memória (configuráveis por env) ---
 WORKSPACE = os.environ.get("AGENTE_WORKSPACE", os.path.join(BASE, "workspace"))
 DADOS = os.environ.get("AGENTE_DADOS", os.path.join(BASE, "dados"))
 
