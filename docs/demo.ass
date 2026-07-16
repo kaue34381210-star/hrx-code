@@ -1,0 +1,36 @@
+[Script Info]
+Title: HRX Code portfolio demo
+ScriptType: v4.00+
+PlayResX: 1200
+PlayResY: 675
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Title,Noto Sans Mono,27,&H00F0F6FC,&H000000FF,&H001B222C,&H000D1117,-1,0,0,0,100,100,0,0,1,0,0,7,54,54,38,1
+Style: Prompt,Noto Sans Mono,22,&H00F0F6FC,&H000000FF,&H001B222C,&H000D1117,0,0,0,0,100,100,0,0,1,0,0,7,70,70,112,1
+Style: Tool,Noto Sans Mono,21,&H00D2A8FF,&H000000FF,&H001B222C,&H000D1117,0,0,0,0,100,100,0,0,1,0,0,7,82,70,174,1
+Style: Dim,Noto Sans Mono,20,&H00919AA4,&H000000FF,&H001B222C,&H000D1117,0,0,0,0,100,100,0,0,1,0,0,7,82,70,174,1
+Style: Yellow,Noto Sans Mono,21,&H0030DFFF,&H000000FF,&H001B222C,&H000D1117,-1,0,0,0,100,100,0,0,1,0,0,7,82,70,174,1
+Style: Green,Noto Sans Mono,21,&H006CE58D,&H000000FF,&H001B222C,&H000D1117,-1,0,0,0,100,100,0,0,1,0,0,7,82,70,174,1
+Style: Red,Noto Sans Mono,21,&H007877FF,&H000000FF,&H001B222C,&H000D1117,-1,0,0,0,100,100,0,0,1,0,0,7,82,70,174,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:15.00,Title,,0,0,0,,HRX CODE  /  agente de IA no terminal
+Dialogue: 0,0:00:00.00,0:00:15.00,Dim,,0,0,0,,{\pos(54,82)}────────────────────────────────────────────────────────────────────────────
+Dialogue: 0,0:00:00.70,0:00:08.00,Prompt,,0,0,0,,{\pos(70,128)}{\c&H00D2A8&}$ {\c&H00F0F6FC&}hrx "revise o projeto e rode os testes"
+Dialogue: 0,0:00:01.70,0:00:08.00,Tool,,0,0,0,,{\pos(82,190)}[HRX]  listar_diretorio(".", true)
+Dialogue: 0,0:00:02.60,0:00:08.00,Tool,,0,0,0,,{\pos(82,235)}[HRX]  buscar_codigo("TODO|FIXME", ".", ".py")
+Dialogue: 0,0:00:03.50,0:00:08.00,Tool,,0,0,0,,{\pos(82,280)}[HRX]  editar_arquivo("app.py", ...)
+Dialogue: 0,0:00:04.50,0:00:08.00,Yellow,,0,0,0,,{\pos(82,335)}AMARELO  confirmação — escreve arquivo no projeto
+Dialogue: 0,0:00:05.30,0:00:08.00,Dim,,0,0,0,,{\pos(82,380)}executar? [Enter=sim · n=não · s=sempre] ›
+Dialogue: 0,0:00:06.10,0:00:08.00,Green,,0,0,0,,{\pos(82,445)}✓ 56 testes passaram em 0.17s
+Dialogue: 0,0:00:06.80,0:00:08.00,Prompt,,0,0,0,,{\pos(82,495)}Alteração concluída e validada.
+Dialogue: 0,0:00:08.20,0:00:15.00,Prompt,,0,0,0,,{\pos(70,128)}{\c&H00D2A8&}$ {\c&H00F0F6FC&}hrx "remova tudo de build"
+Dialogue: 0,0:00:09.30,0:00:15.00,Tool,,0,0,0,,{\pos(82,200)}[HRX]  rodar_comando("rm -rf build")
+Dialogue: 0,0:00:10.40,0:00:15.00,Red,,0,0,0,,{\pos(82,265)}VERMELHO  ALTO RISCO — remove arquivos/diretórios
+Dialogue: 0,0:00:11.40,0:00:15.00,Dim,,0,0,0,,{\pos(82,320)}para executar digite sim › não
+Dialogue: 0,0:00:12.40,0:00:15.00,Green,,0,0,0,,{\pos(82,385)}✓ execução cancelada pelo usuário
+Dialogue: 0,0:00:13.20,0:00:15.00,Dim,,0,0,0,,{\pos(82,445)}Riscos vermelhos nunca são executados sem aprovação explícita.
