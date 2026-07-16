@@ -15,8 +15,9 @@ além de uma interface estilizada. Roda direto do repositório com
 - **Ferramentas (loop ReAct):**
   - `ler_arquivo`, `escrever_arquivo`, `editar_arquivo`, `listar_diretorio`
   - `criar_planilha` (Excel `.xlsx`), `criar_pdf` (PDF com tabela)
-  - `rodar_comando` (whitelist de segurança), `buscar_docs` (RAG simples)
-- **Sandbox:** o agente só lê/escreve dentro de `workspace/` e lê `dados/`.
+  - `rodar_comando` (classificação de risco), `buscar_docs` (RAG simples)
+- **Isolamento de arquivos:** leituras ficam no projeto real; escritas externas
+  exigem confirmação explícita de alto risco e escapes por links são bloqueados.
 - **UI:** banner ASCII, cores e respostas em markdown (via `rich`).
 - **Motor local padrão:** Qwen2.5-7B GGUF em `llamafile`, sem chave, cota ou internet.
 - **Motores configuráveis:** escolha o provedor, modelo, URL e chave pelo
@@ -96,7 +97,9 @@ local.py         cliente do endpoint OpenAI-compatível local
 openai_compat.py adaptador para OpenAI, DeepSeek e Ollama
 claude.py        adaptador para a API Messages da Anthropic
 iniciar-qwen.sh  inicia o llamafile com o modelo GGUF
-ferramentas.py   ferramentas sandboxed
+ferramentas.py   ferramentas de código, documentos, memória e terminal
+caminhos.py      resolução canônica e proteção contra escapes de diretório
+permissao.py     gate de risco e autorização de uso único
 config.py        configuração
 tests/            suíte automatizada com pytest
 ```
@@ -112,8 +115,11 @@ Os mesmos testes rodam no GitHub Actions em Python 3.10, 3.11, 3.12 e 3.13.
 ## Segurança
 
 - Chaves ficam fora do código e fora do git (`chaves.txt`, ignorado).
-- O agente não acessa nada fora de `workspace/` e `dados/`.
-- `rodar_comando` só executa comandos da whitelist.
+- Leituras são limitadas ao projeto, inclusive após resolver links simbólicos.
+- Escritas no projeto passam pelo gate; caminhos externos são sempre 🔴 e
+  exigem que o usuário digite `sim`, mesmo no modo automático.
+- Comandos de terminal são classificados por risco e protegidos por um trinco
+  de autorização de uso único.
 - O free tier do Gemini pode usar prompts para treino — **não envie dados
   sensíveis**.
 

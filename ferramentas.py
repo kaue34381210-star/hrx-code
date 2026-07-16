@@ -1,5 +1,8 @@
-"""Ferramentas do agente. Arquivos restritos a WORKSPACE/ e DADOS/;
-o git opera no repositório do diretório atual (config.REPO)."""
+"""Ferramentas do agente para o projeto, documentos, memória e terminal.
+
+Leituras ficam restritas ao projeto real. Escritas externas são possíveis só
+depois do gate explícito de alto risco definido em ``permissao.py``.
+"""
 import os
 import glob
 import json
@@ -7,6 +10,7 @@ import shlex
 import datetime
 import subprocess
 
+import caminhos
 import config
 import permissao
 
@@ -18,23 +22,16 @@ _IGNORAR = {".git", "node_modules", ".venv", "venv", "__pycache__",
 
 
 def _dentro(base: str, caminho: str) -> str:
-    alvo = os.path.normpath(os.path.join(base, caminho))
-    if alvo != base and not alvo.startswith(base + os.sep):
-        raise ValueError(f"Caminho fora da área permitida (bloqueado): {caminho}")
-    return alvo
+    return caminhos.exigir_dentro(base, caminho)
 
 
 def _resolver_alvo(caminho: str) -> str:
-    """Resolve o caminho de ESCRITA de uma ferramenta. Expande `~` e aceita
-    caminho absoluto (pode escrever fora do REPO); relativo é resolvido contra
-    REPO. Sempre retorna caminho absoluto normalizado. A barreira é o gate
-    humano 🟡 + trinco (permissao.py), não este helper."""
-    if not caminho or not str(caminho).strip():
-        raise ValueError("caminho vazio")
-    expandido = os.path.expanduser(str(caminho))
-    if os.path.isabs(expandido):
-        return os.path.normpath(expandido)
-    return os.path.normpath(os.path.join(config.REPO, expandido))
+    """Canoniza o alvo de escrita usando a mesma regra do gate de risco.
+
+    Caminhos relativos usam o projeto; absolutos podem apontar para fora, mas
+    nesse caso ``permissao.Politica`` exige confirmação 🔴 antes do trinco.
+    """
+    return caminhos.resolver(config.REPO, caminho)
 
 
 def _garantir() -> None:
@@ -65,7 +62,7 @@ def ler_arquivo(caminho: str, inicio: int = None, fim: int = None) -> str:
 
 def escrever_arquivo(caminho: str, conteudo: str) -> str:
     """Cria/sobrescreve um arquivo. Aceita caminho relativo (contra o projeto)
-    ou absoluto (`~/Downloads/...`, `/tmp/...`). Passa pelo trinco de aprovação."""
+    ou absoluto. Caminhos externos exigem confirmação explícita de alto risco."""
     if not permissao.consumir(permissao.comando_de("escrever_arquivo", {"caminho": caminho})):
         return "ERRO: escrita não passou pela aprovação de risco (trinco de segurança)."
     alvo = _resolver_alvo(caminho)

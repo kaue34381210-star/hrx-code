@@ -6,6 +6,9 @@ comportamento, os comandos ou a configuração mudarem.
 
 ## Mudanças recentes
 
+- Caminhos agora são canonizados antes do uso: leituras bloqueiam escapes por
+  `..` e links simbólicos, enquanto escritas fora do projeto são sempre risco
+  vermelho e exigem confirmação explícita, inclusive no modo automático.
 - Testes avulsos migrados para uma suíte `pytest`, com execução automática no
   GitHub Actions em Python 3.10 a 3.13 e dependências declaradas em arquivos
   `requirements`.
