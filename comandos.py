@@ -1,27 +1,10 @@
-"""Slash commands customizáveis do HRX CODE.
-
-Cada arquivo `.md` em `~/.config/hrx/comandos/` vira um comando `/nome` no chat.
-O corpo do arquivo é injetado como pergunta do usuário — o modelo continua no
-mesmo fluxo (ReAct + ferramentas + gate 🟢🟡🔴), só que o prompt vem pronto.
-
-Formato do arquivo (frontmatter é opcional):
-
-    ---
-    descricao: uma linha resumindo o que este comando faz
-    ---
-    Prompt que será enviado ao agente.
-    Use {argumentos} para injetar o que veio depois do comando (opcional).
-
-Comando colidindo com built-in (/ajuda, /config, /motor, /memoria, ...) é
-ignorado silenciosamente — os built-ins vencem.
-"""
+"""Comandos customizáveis carregados de arquivos Markdown."""
 import os
 
 _DIR_ENV = "HRX_COMANDOS_DIR"
 _DIR_PADRAO = "~/.config/hrx/comandos"
 
-# Nomes reservados: qualquer /coisa tratada em agente._comando_especial. Manter
-# em sincronia com aquele arquivo — colisão silenciosa aqui, não quebra.
+# Deve permanecer sincronizado com ``agente._comando_especial``.
 BUILTIN = frozenset({
     "/sair", "/quit", "/exit", "/ajuda", "/help",
     "/config", "/perfil", "/debug", "/novo", "/reset",
@@ -60,8 +43,7 @@ def _parse(texto: str) -> tuple:
 
 
 def carregar(forcar: bool = False) -> dict:
-    """Lê todos os `.md` da pasta e devolve {'/nome': {descricao, corpo, arquivo}}.
-    Cacheado; passe forcar=True para reler do disco."""
+    """Carrega os comandos Markdown, usando cache salvo em memória."""
     global _CACHE
     if _CACHE is not None and not forcar:
         return _CACHE
@@ -92,9 +74,7 @@ def carregar(forcar: bool = False) -> dict:
 
 
 def expandir(entrada: str):
-    """Se `entrada` começa com um comando customizado, devolve o prompt
-    expandido (com {argumentos} substituído por tudo depois do comando).
-    Devolve None se não for um comando customizado."""
+    """Expande um comando customizado ou retorna ``None``."""
     partes = entrada.strip().split(None, 1)
     if not partes:
         return None

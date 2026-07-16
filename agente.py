@@ -1,4 +1,4 @@
-"""Agente de terminal com motor Gemini e failover de chaves."""
+"""Agente de IA para terminal."""
 import json
 import sys
 import getpass
@@ -201,8 +201,7 @@ def _ler_segredo(prompt: str) -> str:
 
 def _aprovar_comando(pol: permissao.Politica, comando: str,
                      ferramenta: str = None, args: dict = None):
-    """Gate interativo 🟢🟡🔴 usando a política da sessão.
-    Retorna (permitido, resultado_bloqueio)."""
+    """Aplica o gate interativo da política da sessão."""
     nivel, motivo = pol.classificar(comando, ferramenta=ferramenta, args=args)
 
     if nivel == "verde":
@@ -233,8 +232,7 @@ def _aprovar_comando(pol: permissao.Politica, comando: str,
 
 
 def _janela(historico: list) -> list:
-    """Mantém as mensagens mais RECENTES dentro do orçamento de contexto, pra
-    conversa longa não estourar o limite do modelo (especialmente o local)."""
+    """Mantém as mensagens recentes dentro do orçamento de contexto."""
     orcamento = config.CONTEXTO_MAX_CHARS
     total, mantidos = 0, []
     for m in reversed(historico):
@@ -314,11 +312,7 @@ def _debug_estado(pool, pol: permissao.Politica, historico: list) -> str:
 
 
 def rodar(motor_chamar, pol: permissao.Politica, historico: list, pergunta: str) -> str:
-    """Executa um turno do usuário mantendo o HISTÓRICO da conversa.
-    `motor_chamar(mensagens) -> texto` (Gemini ou local). `historico` é a lista
-    de mensagens da conversa (sem o system); é mutada in-place, então persiste
-    entre os turnos do REPL — é isso que dá memória de curto prazo ao agente.
-    `pol` é a política de permissões da sessão."""
+    """Executa um turno e atualiza o histórico da conversa."""
     historico.append({"role": "user", "content": pergunta})
     for _ in range(config.MAX_ITER):
         contexto = "\n".join(m.get("content", "") for m in historico[-6:])
@@ -342,7 +336,7 @@ def rodar(motor_chamar, pol: permissao.Politica, historico: list, pergunta: str)
             permitido, bloqueio = _aprovar_comando(
                 pol, comando, ferramenta=nome, args=args)
             if permitido:
-                pol.liberar(comando)          # abre o trinco só p/ esta chamada
+                pol.liberar(comando)
                 resultado = ferramentas.executar(nome, args)
             else:
                 resultado = bloqueio
@@ -499,9 +493,7 @@ def _editar_perfil() -> None:
 
 def _comando_especial(motor_chamar, pool, pol: permissao.Politica, historico: list,
                       entrada: str) -> bool:
-    """Trata /comandos. `pool` é None quando o motor é local. `pol` é a política
-    de permissões, `historico` a conversa atual (mutável). Retorna True se
-    consumiu a entrada."""
+    """Trata comandos internos e informa se consumiu a entrada."""
     cmd = entrada.lower()
     partes = cmd.split()
     if cmd in ("/sair", "sair", "exit", "quit", "/quit"):
@@ -703,8 +695,7 @@ def _erro_sem_chave(rotulo: str) -> None:
 
 
 def _preparar_motor():
-    """Monta (motor_chamar, pool, rotulo) conforme config.MOTOR.
-    pool só existe no motor gemini (failover de chaves); nos outros é None."""
+    """Monta a função de chamada, o pool e o rótulo do motor configurado."""
     if config.MOTOR not in config.MOTORES:
         raise RuntimeError(
             "HRX_MOTOR inválido: " + repr(config.MOTOR) +
@@ -721,7 +712,6 @@ def _preparar_motor():
                 title="[yellow]motor local fora do ar", border_style="yellow"))
         return (lambda msgs: local.chamar(msgs)[0]), None, rotulo
 
-    # Motores por API (protocolo OpenAI: openai/deepseek/ollama/groq; Anthropic: claude)
     if config.MOTOR in ("openai", "deepseek", "ollama", "groq", "claude"):
         p = config.provedor(config.MOTOR)
         if p["exige_chave"] and not p["chave"]:
@@ -766,16 +756,14 @@ def main() -> None:
     motor_chamar, pool, rotulo = _preparar_motor()
     banner(rotulo, len(ferramentas.carregar_memorias()))
 
-    # política de permissões da sessão (modo via HRX_MODO; registra o
-    # singleton que as ferramentas consultam pelo trinco).
     pol = permissao.Politica(modo=getattr(config, "MODO", "cauteloso"),
                              seguros_extra=getattr(config, "COMANDOS_PERMITIDOS", ()))
     permissao.usar(pol)
 
-    historico: list = []   # conversa viva; persiste entre turnos do REPL
+    historico: list = []
 
     arg = " ".join(sys.argv[1:]).strip()
-    if arg:  # modo one-shot
+    if arg:
         expandido = comandos.expandir(arg)
         if expandido is not None:
             arg = expandido
@@ -800,8 +788,6 @@ def main() -> None:
         try:
             if _comando_especial(motor_chamar, pool, pol, historico, entrada):
                 continue
-            # Se for um comando customizado (ex.: /revisar), expande o prompt
-            # e segue o fluxo normal do agente com o texto expandido.
             expandido = comandos.expandir(entrada)
             if expandido is not None:
                 console.print(f"  [grey50]▸ expandindo[/grey50] [cyan]"

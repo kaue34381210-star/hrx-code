@@ -1,8 +1,4 @@
-"""Ferramentas do agente para o projeto, documentos, memória e terminal.
-
-Leituras ficam restritas ao projeto real. Escritas externas são possíveis só
-depois do gate explícito de alto risco definido em ``permissao.py``.
-"""
+"""Ferramentas de projeto, documentos, memória e terminal."""
 import os
 import glob
 import json
@@ -15,7 +11,6 @@ import config
 import permissao
 
 
-# Diretórios de lixo/geração que a navegação e a busca ignoram.
 _IGNORAR = {".git", "node_modules", ".venv", "venv", "__pycache__",
             ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build",
             ".next", ".turbo", "target", ".idea", ".gradle"}
@@ -26,11 +21,7 @@ def _dentro(base: str, caminho: str) -> str:
 
 
 def _resolver_alvo(caminho: str) -> str:
-    """Canoniza o alvo de escrita usando a mesma regra do gate de risco.
-
-    Caminhos relativos usam o projeto; absolutos podem apontar para fora, mas
-    nesse caso ``permissao.Politica`` exige confirmação 🔴 antes do trinco.
-    """
+    """Resolve um alvo de escrita com a mesma regra do gate de risco."""
     return caminhos.resolver(config.REPO, caminho)
 
 
@@ -143,14 +134,10 @@ def buscar_codigo(padrao: str, caminho: str = ".", ext: str = None) -> str:
 
 
 def rodar_comando(comando: str) -> str:
-    # A barreira real é o gate humano 🟢🟡🔴 em agente.py, que classifica a
-    # STRING completa (incluindo pipes/redirecionamentos). Aqui executamos no
-    # diretório de onde o hrx foi chamado (config.REPO) — igual ao git — e
-    # via shell, pra que pipe/redirect/glob/&& funcionem de verdade.
+    # shell=True é necessário para pipes, redirecionamentos, glob e encadeamento.
     comando = comando.strip()
     if not comando:
         return "ERRO: comando vazio"
-    # TRINCO: só executa se o gate de permissões liberou ESTE comando agora.
     if not permissao.consumir(comando):
         return ("ERRO: comando não passou pela aprovação de risco (trinco de "
                 "segurança). Chame pelo fluxo normal — não há como pular o gate.")
@@ -165,10 +152,7 @@ def rodar_comando(comando: str) -> str:
 
 
 def git(args: str = "") -> str:
-    """Roda `git <args>` no repositório atual (config.REPO). A liberação por
-    risco (🟢🟡🔴) acontece na camada de aprovação (agente.py)."""
-    # TRINCO: mesmo esquema do rodar_comando. A string liberada pelo gate é
-    # "git <args>" (ver permissao.COMANDO_DE_FERRAMENTA["git"]).
+    """Roda ``git <args>`` no repositório atual após aprovação."""
     if not permissao.consumir(("git " + (args or "")).strip()):
         return ("ERRO: git não passou pela aprovação de risco (trinco de "
                 "segurança). Chame pelo fluxo normal.")
@@ -249,7 +233,6 @@ def criar_planilha(nome: str, dados: list, cabecalho: list = None) -> str:
     if tem_cabecalho:
         for c in ws[1]:
             c.font = Font(bold=True)
-    # largura automática simples
     for col in ws.columns:
         largura = max((len(str(c.value)) for c in col if c.value is not None), default=8)
         ws.column_dimensions[col[0].column_letter].width = min(largura + 2, 60)
@@ -604,11 +587,6 @@ def buscar_docs(consulta: str) -> str:
     return "\n\n---\n\n".join(f"[{n}] (rel. {s})\n{b[:500]}" for s, n, b in achados[:4])
 
 
-# ---------------------------------------------------------------------------
-# Fetch de URL — trazer conteúdo da web como texto legível ao agente.
-# Bloqueia SSRF pra IP interno (loopback/privado/link-local/reservado) e
-# valida cada hop de redirect. Sem novas deps: usa stdlib pro parse de HTML.
-# ---------------------------------------------------------------------------
 _WEB_TAGS_IGNORAR = {"script", "style", "noscript", "svg", "iframe",
                      "nav", "header", "footer", "aside", "form", "template"}
 _WEB_TAGS_BLOCO = {"p", "div", "section", "article", "li", "tr",
@@ -618,7 +596,7 @@ _WEB_TAGS_H = {"h1": "# ", "h2": "## ", "h3": "### ",
 
 
 def _html_para_texto(html: str) -> str:
-    """HTML → texto ~markdown. Simples e sem deps, bom o bastante pra LLM ler."""
+    """Converte HTML em texto próximo de Markdown."""
     import re as _re
     from html.parser import HTMLParser
 
@@ -675,15 +653,11 @@ def _html_para_texto(html: str) -> str:
 
 
 def _validar_url_publica(url: str) -> str:
-    """Valida esquema e bloqueia IP interno (SSRF). Retorna a URL normalizada.
-    Resolve TODOS os endereços (v4 e v6) via getaddrinfo e reprova se qualquer
-    um for privado/loopback/link-local/reservado/multicast/mapeado. Também
-    normaliza IPv4-mapped IPv6 (::ffff:x.x.x.x) antes da checagem.
-    Resíduo aceito: DNS rebinding TOCTOU — o `requests.get` resolve de novo
-    e o servidor pode responder outro IP entre a validação e o connect. Mitigar
-    de verdade exigiria pin de IP + Host header via HTTPAdapter customizado;
-    fora do escopo desta versão. O agente é single-user; o risco requer
-    injeção de prompt E domínio controlado pelo atacante."""
+    """Valida o esquema e bloqueia endereços internos contra SSRF.
+
+    Ainda há risco de DNS rebinding entre a validação e a conexão; eliminá-lo
+    exige fixar o IP e o cabeçalho Host em um adaptador HTTP próprio.
+    """
     import ipaddress
     import socket
     from urllib.parse import urlparse
@@ -703,7 +677,7 @@ def _validar_url_publica(url: str) -> str:
     for info in infos:
         endereco = info[4][0]
         ip = ipaddress.ip_address(endereco)
-        # IPv4-mapped IPv6 (::ffff:a.b.c.d) → normaliza p/ IPv4 antes de checar
+        # Normaliza IPv4 mapeado em IPv6 antes da validação.
         if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
             ip = ip.ipv4_mapped
         if (ip.is_private or ip.is_loopback or ip.is_link_local

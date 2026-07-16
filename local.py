@@ -1,15 +1,9 @@
-"""Motor local: modelo servido via llama.cpp/llamafile num endpoint compatível
-com a API da OpenAI (/v1/chat/completions). Sem chaves, sem cota, offline.
-
-Subir o servidor (Qwen2.5-7B-Instruct):
-    ./iniciar-qwen.sh
-"""
+"""Adaptador para modelo local compatível com Chat Completions."""
 import requests
 from urllib.parse import urlsplit, urlunsplit
 
 import config
 
-# dica de como subir o modelo, mostrada quando a conexão falha
 DICA_SERVIDOR = "./iniciar-qwen.sh"
 
 
@@ -39,8 +33,7 @@ def disponivel() -> bool:
 
 
 def chamar(mensagens: list, on_rotacao=None):
-    """Assinatura compatível com gemini.chamar (on_rotacao é ignorado).
-    Retorna (texto, None)."""
+    """Chama o modelo local e retorna texto e índice de chave vazio."""
     body = {
         "model": config.MODELO_LOCAL,
         "messages": mensagens,

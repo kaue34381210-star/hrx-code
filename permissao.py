@@ -1,26 +1,10 @@
-"""Política de permissões da sessão do HRX CODE.
-
-Junta numa camada só as quatro peças do controle de execução:
-
-  1. classificação de risco 🟢🟡🔴 (delega a `aprovacao.classificar`);
-  2. modo da sessão — `blindado` / `cauteloso` / `auto` — que ajusta o rigor;
-  3. lista "sempre permitir" desta sessão (o usuário marca e não pergunta mais);
-  4. um TRINCO de uso único que as ferramentas sensíveis conferem — assim
-     nenhuma chamada não-aprovada executa, mesmo que um caminho de código novo
-     esqueça de passar pelo gate interativo (defesa em profundidade; era a
-     pendência apontada na revisão de segurança).
-
-`agente.py` é o gate interativo (pergunta ao humano) e `ferramentas.py` é o
-executor; ambos importam ESTE módulo, que é a fonte única da verdade.
-"""
+"""Política de permissões da sessão do HRX Code."""
 import os
 
 import aprovacao
 import caminhos
 import config
 
-# Ferramentas que exigem aprovação e como derivar, dos args do modelo, a string
-# de comando que será classificada/liberada. Fonte única p/ agente e ferramentas.
 COMANDO_DE_FERRAMENTA = {
     "rodar_comando": lambda a: str((a or {}).get("comando", "")).strip(),
     "git": lambda a: ("git " + str((a or {}).get("args", ""))).strip(),
@@ -30,7 +14,6 @@ COMANDO_DE_FERRAMENTA = {
     "criar_pdf": lambda a: f"criar_pdf {(a or {}).get('nome', '')}".strip(),
 }
 
-# Ferramentas de ESCRITA: dentro do projeto são 🟡; fora dele são sempre 🔴.
 FERRAMENTAS_ESCRITA = {"escrever_arquivo", "editar_arquivo",
                        "criar_planilha", "criar_pdf"}
 
@@ -41,10 +24,8 @@ CAMPO_CAMINHO = {
     "criar_pdf": "nome",
 }
 
-MODOS = ("blindado", "cauteloso", "auto")   # do mais rígido ao mais solto
+MODOS = ("blindado", "cauteloso", "auto")
 
-# Ferramentas "multi-comando": a assinatura do 'sempre permitir' usa 2 tokens
-# (ex: "git commit", "npm install") em vez de só o executável.
 _MULTI = {"git", "pip", "pip3", "pipx", "npm", "pnpm", "yarn", "docker",
           "podman", "kubectl", "cargo", "go", "apt", "apt-get", "dnf", "yum",
           "pacman", "brew", "systemctl", "service"}
@@ -60,8 +41,7 @@ def comando_de(nome: str, args: dict) -> str:
 
 
 def assinatura(comando: str) -> str:
-    """Reduz um comando a uma assinatura estável p/ o 'sempre permitir':
-    'git commit -m x' -> 'git commit'; 'mkdir build' -> 'mkdir'."""
+    """Reduz um comando à assinatura usada por "sempre permitir"."""
     toks = comando.split()
     if not toks:
         return ""
@@ -72,22 +52,20 @@ def assinatura(comando: str) -> str:
 
 
 class Politica:
-    """Estado de permissões de UMA sessão do agente."""
+    """Estado de permissões de uma sessão."""
 
     def __init__(self, modo: str = None, seguros_extra=()):
         modo = (modo or "cauteloso").strip().lower()
         self.modo = modo if modo in MODOS else "cauteloso"
         self.seguros_extra = set(seguros_extra)
-        self.sempre = set()       # assinaturas liberadas p/ a sessão inteira
-        self._trinco = None       # token de uso único p/ a próxima ferramenta
+        self.sempre = set()
+        self._trinco = None
 
     def classificar(self, comando: str, ferramenta: str = None, args: dict = None):
-        """(nivel, motivo) já ajustado pelo modo e pela lista 'sempre'.
-        REGRA DE SEGURANÇA: 🔴 nunca é rebaixado — nem por 'sempre', nem por
-        modo auto. A assinatura casa 2 tokens, então um 'git commit' liberado
-        JAMAIS pode arrastar um 'git commit ... && rm -rf' (que é 🔴).
-        Escritas fora do projeto entram em 🔴, inclusive escapes por ``..`` ou
-        links simbólicos, e nunca são rebaixadas pelo modo da sessão."""
+        """Classifica um comando conforme o modo e as permissões da sessão.
+
+        Riscos vermelhos e escritas fora do projeto nunca são rebaixados.
+        """
         if ferramenta in FERRAMENTAS_ESCRITA:
             campo = CAMPO_CAMINHO[ferramenta]
             informado = str((args or {}).get(campo, ""))
@@ -114,22 +92,17 @@ class Politica:
         self.sempre.add(assi)
         return assi
 
-    # --- trinco de uso único (defesa na camada da ferramenta) ---
     def liberar(self, comando: str) -> None:
-        """Autoriza a PRÓXIMA execução da ferramenta cujo comando é `comando`."""
+        """Autoriza uma execução da ferramenta para o comando."""
         self._trinco = comando
 
     def consumir(self, comando: str) -> bool:
-        """A ferramenta chama isto: True só se o comando foi liberado agora.
-        O token é de uso único (some ao ser lido)."""
+        """Consome a autorização de uso único do comando."""
         ok = self._trinco is not None and self._trinco == comando
         self._trinco = None
         return ok
 
 
-# ---------------------------------------------------------------------------
-# Política ativa da sessão. `ferramentas.py` consulta este singleton pelo trinco.
-# ---------------------------------------------------------------------------
 _ATUAL = None
 
 
@@ -143,8 +116,7 @@ def ativa():
 
 
 def consumir(comando: str) -> bool:
-    """Chamado pelas ferramentas sensíveis. Sem política ativa (uso
-    programático/testes) não trava; com política ativa, exige token válido."""
+    """Valida a autorização quando há uma política ativa."""
     if _ATUAL is None:
         return True
     return _ATUAL.consumir(comando)

@@ -1,9 +1,4 @@
-"""Adaptador para provedores que falam o protocolo da OpenAI
-(POST /v1/chat/completions): OpenAI/ChatGPT, DeepSeek, Ollama e modelos locais
-(llamafile). Um único código — muda só base_url + chave + modelo.
-
-Mesma assinatura dos outros motores: chamar(mensagens) -> (texto, None).
-"""
+"""Adaptador para provedores compatíveis com Chat Completions."""
 import requests
 
 import config
@@ -11,8 +6,7 @@ import config
 
 def chamar(mensagens: list, base_url: str, modelo: str, api_key: str = None,
            timeout: int = None, on_rotacao=None):
-    """Chama um endpoint estilo OpenAI. `mensagens` é o formato interno
-    [{"role","content"}] — já compatível. Retorna (texto, None)."""
+    """Chama um endpoint compatível e retorna texto e índice de chave vazio."""
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"

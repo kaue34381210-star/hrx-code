@@ -1,20 +1,8 @@
-"""Aprovação inteligente de comandos — classificação de risco 🟢🟡🔴.
-
-Substitui a whitelist rígida por um classificador heurístico:
-
-- 🟢 verde   → somente leitura / inofensivo  → roda direto
-- 🟡 amarelo → modifica o sistema (reversível) → pede confirmação simples
-- 🔴 vermelho → destrutivo / irreversível       → exige 'sim' explícito
-
-Regra de ouro: na dúvida, escala para 🟡 (nunca roda algo desconhecido sem
-perguntar). É heurístico, não à prova de balas — a confirmação humana é a
-verdadeira barreira.
-"""
+"""Classificação heurística de risco para comandos."""
 import os
 import re
 
-# Executáveis claramente somente-leitura → 🟢. Formas perigosas destes (ex:
-# `find -delete`, `git push -f`) são pegas ANTES, nos padrões VERMELHO/AMARELO.
+# Padrões perigosos são avaliados antes destas listas.
 SEGUROS = {
     "ls", "dir", "pwd", "cat", "type", "head", "tail", "echo", "printf",
     "whoami", "hostname", "date", "uptime", "cal", "df", "du", "free",
@@ -23,7 +11,6 @@ SEGUROS = {
     "cut", "column", "tr", "grep", "egrep", "fgrep", "rg", "file", "stat",
     "tree", "basename", "dirname", "realpath", "readlink", "history",
     "man", "help", "clear", "cd", "test", "true", "false",
-    # leitura/consulta acrescentados (formas destrutivas já pegas acima)
     "find", "locate", "less", "more", "diff", "comm", "cmp", "pgrep",
     "md5sum", "sha1sum", "sha256sum", "sha512sum", "b2sum", "cksum",
     "lsblk", "lscpu", "lsusb", "lspci", "lsof", "ss", "netstat",
@@ -31,8 +18,6 @@ SEGUROS = {
     "command", "apropos", "getent", "hexdump", "xxd", "strings",
 }
 
-# Subcomandos SÓ-LEITURA de ferramentas que, no geral, modificam → 🟢.
-# (o resto dessas ferramentas continua 🟡 via MUTANTES/AMARELO.)
 LEITURA_POR_SUB = {
     "pip": {"list", "show", "freeze", "search", "index", "check", "--version", "-v"},
     "pip3": {"list", "show", "freeze", "search", "index", "check", "--version", "-v"},
@@ -56,7 +41,6 @@ LEITURA_POR_SUB = {
     "brew": {"list", "info", "search", "outdated", "--version"},
 }
 
-# Padrões de ALTO RISCO → 🔴 (verificados primeiro, ganham de tudo)
 VERMELHO = [
     (re.compile(r"(^|\s):\s*\(\s*\)\s*\{"), "fork bomb"),
     (re.compile(r"\brm\b"), "remove arquivos/diretórios"),
@@ -80,7 +64,6 @@ VERMELHO = [
     (re.compile(r"\bcrontab\b\s+-r"), "apaga todas as tarefas agendadas"),
 ]
 
-# Padrões que MODIFICAM mas costumam ser reversíveis → 🟡
 AMARELO = [
     (re.compile(r"\bsed\b.+-\w*i"), "sed editando arquivo no lugar"),
     (re.compile(r">>?"), "redireciona/sobrescreve saída em arquivo"),
@@ -90,7 +73,6 @@ AMARELO = [
     (re.compile(r"\bdocker\b\s+(run|rm|rmi|stop|kill|build|compose|exec|prune)"), "opera containers Docker"),
 ]
 
-# Executáveis que, sem cair nos padrões acima, ainda assim modificam → 🟡
 MUTANTES = {
     "mkdir", "touch", "cp", "mv", "ln", "tee", "install", "make", "cmake",
     "tar", "zip", "unzip", "gzip", "gunzip", "git", "apt", "apt-get", "dnf",
@@ -100,8 +82,7 @@ MUTANTES = {
     "awk", "nmap", "curl", "wget", "ssh", "scp", "rsync",
 }
 
-# Flags que tornam um git "de leitura" capaz de escrever arquivo ou executar
-# código (defesa contra argv flag smuggling / config injection).
+# Flags que permitem a um git de leitura escrever arquivos ou executar código.
 GIT_FLAGS_SENSIVEIS = re.compile(
     r"(^|\s)(-c\b|-C\b|--exec-path|--output\b|-O\b|--open-files-in-pager"
     r"|--ext-diff|--upload-pack|--receive-pack|--exec\b|--pager\b)")
@@ -122,22 +103,17 @@ def classificar(comando: str, seguros_extra=()) -> tuple:
     if not c:
         return ("vermelho", "comando vazio")
 
-    # 1) alto risco vence tudo
     for rx, motivo in VERMELHO:
         if rx.search(c):
             return ("vermelho", motivo)
 
-    # 2) padrões que forçam confirmação
     for rx, motivo in AMARELO:
         if rx.search(c):
             return ("amarelo", motivo)
 
     exe = _executavel(c)
 
-    # 3) git só-leitura é seguro; o resto do git já foi pego no passo 2
     if exe == "git":
-        # flags que transformam um git "de leitura" em escrita/execução:
-        # config injection (-c), saída em arquivo, diff/pager externos, etc.
         if GIT_FLAGS_SENSIVEIS.search(c):
             return ("amarelo", "git com flag sensível")
         sub = (c.split()[1].lower() if len(c.split()) > 1 else "")
@@ -147,20 +123,16 @@ def classificar(comando: str, seguros_extra=()) -> tuple:
             return ("verde", f"git {sub} (leitura)".strip())
         return ("amarelo", "altera o repositório git")
 
-    # 3b) subcomando só-leitura de uma ferramenta que costuma modificar → 🟢
     if exe in LEITURA_POR_SUB:
         partes = c.split()
         sub = partes[1].lower() if len(partes) > 1 else ""
         if sub in LEITURA_POR_SUB[exe]:
             return ("verde", f"{exe} {sub} (leitura)")
 
-    # 4) seguros conhecidos (mais os liberados via config)
     if exe in SEGUROS or exe in set(seguros_extra):
         return ("verde", "somente leitura")
 
-    # 5) mutantes conhecidos
     if exe in MUTANTES:
         return ("amarelo", "modifica o sistema")
 
-    # 6) desconhecido → na dúvida, confirma
     return ("amarelo", f"comando não classificado ({exe})")

@@ -1,15 +1,4 @@
-"""Adaptador para a API da Anthropic (Claude) — endpoint Messages, via HTTP
-puro (requests), coerente com os outros motores do HRX CODE (sem SDK).
-
-Doc oficial: POST https://api.anthropic.com/v1/messages
-  headers: x-api-key, anthropic-version: 2023-06-01, content-type: json
-  body:    {model, max_tokens, system, messages:[{role:user|assistant, content}]}
-
-Diferenças do protocolo (vs OpenAI): o system vai num campo TOP-LEVEL (não na
-lista messages), e não se manda `temperature`/`thinking` (nos modelos Opus 4.x
-esses campos dão 400 e sujariam o JSON do protocolo ReAct). Mesma assinatura
-dos outros motores: chamar(mensagens) -> (texto, None).
-"""
+"""Adaptador HTTP para a API Messages da Anthropic."""
 import requests
 
 import config
@@ -18,8 +7,7 @@ VERSAO_API = "2023-06-01"
 
 
 def _para_claude(mensagens: list):
-    """Formato interno -> (system, messages) do Claude. Junta os 'system' num
-    só campo top-level; o resto vira user/assistant."""
+    """Converte mensagens internas para o formato da Anthropic."""
     system = None
     msgs = []
     for m in mensagens:
