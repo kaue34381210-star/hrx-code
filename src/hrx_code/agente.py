@@ -53,6 +53,7 @@ Ferramentas de arquivo (agem no PROJETO real, com números de linha):
 - ler_arquivo(caminho, inicio, fim)    lê o arquivo; inicio/fim = intervalo de linhas (1-based), opcional
 - escrever_arquivo(caminho, conteudo)  cria/sobrescreve um arquivo; caminhos externos ao projeto exigem confirmação de alto risco
 - editar_arquivo(caminho, procurar, substituir)  busca-e-substitui exato num arquivo existente (mesmo esquema de caminho)
+- aplicar_patch(caminho, patch)  aplica hunks de diff unificado com detecção de conflito e escrita atômica
 
 Outras ferramentas:
 - criar_planilha(nome, dados, cabecalho)  cria Excel .xlsx (caminhos externos exigem confirmação de alto risco)
@@ -81,10 +82,11 @@ FLUXO DE ENGENHARIA:
   esses comandos estiverem definidos no projeto. Nunca alegue que passaram sem
   executá-los.
 
-EDIÇÃO DE ARQUIVOS: use editar_arquivo com um trecho 'procurar' único e literal,
-copiando a indentação exata. Para arquivo novo ou reescrita total, use
-escrever_arquivo. Preserve alterações existentes do usuário e não desfaça
-mudanças fora do escopo.
+EDIÇÃO DE ARQUIVOS: prefira aplicar_patch para mudanças localizadas ou com mais
+de um trecho, usando contexto suficiente para detectar conflitos. Use
+editar_arquivo apenas com um trecho 'procurar' único e literal, copiando a
+indentação exata. Para arquivo novo ou reescrita total, use escrever_arquivo.
+Preserve alterações existentes do usuário e não desfaça mudanças fora do escopo.
 
 GIT: use a ferramenta git para inspecionar e versionar o repositório do projeto.
 Você pode consultar status, diff e histórico quando isso ajudar a tarefa. Nunca

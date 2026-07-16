@@ -116,7 +116,8 @@ resposta final.
 
 ## Capacidades
 
-- Navegação, leitura, busca e edição de código com números de linha.
+- Navegação, leitura, busca e edição de código com números de linha e aplicação
+  atômica de patches unificados com detecção de conflitos.
 - Fluxo de engenharia que lê o contexto antes de editar, preserva mudanças do
   usuário e valida o resultado com os testes e verificações definidos no projeto.
 - Execução de shell e operações Git no diretório do projeto.
@@ -160,7 +161,7 @@ python -m pip install -e ".[dev]"
 python -m pytest
 ```
 
-A suíte possui 94 testes, cobre atualmente 48% do pacote e roda no GitHub
+A suíte possui 100 testes, cobre atualmente 50% do pacote e roda no GitHub
 Actions com Python 3.10, 3.11, 3.12 e 3.13. O CI exige no mínimo 40% de
 cobertura. Para recriar a demonstração do README, instale o FFmpeg e execute:
 

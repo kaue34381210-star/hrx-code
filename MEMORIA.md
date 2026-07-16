@@ -6,6 +6,10 @@ comportamento, os comandos ou a configuração mudarem.
 
 ## Mudanças recentes
 
+- Adicionada a ferramenta `aplicar_patch`, que aplica hunks de diff unificado a
+  um arquivo por vez, valida contexto e contagens antes da escrita, rejeita
+  conflitos sem alteração parcial e usa o mesmo trinco de autorização das
+  demais ferramentas de escrita.
 - Prompt de sistema revisado para tornar o agente mais conciso e autônomo em
   ações seguras, exigir leitura do contexto e respeito às convenções antes de
   editar, validar mudanças com testes e ferramentas do projeto, preservar
@@ -24,7 +28,7 @@ comportamento, os comandos ou a configuração mudarem.
 - Testes avulsos migrados para uma suíte `pytest`, com execução automática no
   GitHub Actions em Python 3.10 a 3.13 e dependências declaradas em arquivos
   `requirements`.
-- Suíte ampliada para 94 testes e cobertura automatizada com `pytest-cov`;
+- Suíte ampliada para 100 testes e cobertura automatizada com `pytest-cov`;
   comandos, memória, ferramentas e provedores agora têm testes dedicados, e o
   CI rejeita cobertura total abaixo de 40%.
 - Classificador de risco agora tokeniza e normaliza comandos shell, bloqueando

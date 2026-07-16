@@ -77,6 +77,97 @@ def test_edita_todas_as_ocorrencias_com_autorizacao(projeto):
     assert arquivo.read_text(encoding="utf-8") == "novo\nlinha\nnovo\n"
 
 
+def test_aplica_patch_unificado_com_multiplos_hunks(projeto):
+    arquivo = projeto / "app.txt"
+    arquivo.write_text("um\ndois\ntres\nquatro\n", encoding="utf-8")
+    politica = permissao.Politica()
+    permissao.usar(politica)
+    comando = permissao.comando_de("aplicar_patch", {"caminho": "app.txt"})
+    politica.liberar(comando)
+    patch = """--- a/app.txt
++++ b/app.txt
+@@ -1,3 +1,4 @@
+ um
+-dois
++DOIS
++extra
+ tres
+@@ -4 +5 @@
+-quatro
++QUATRO
+"""
+
+    resultado = ferramentas.aplicar_patch("app.txt", patch)
+
+    assert resultado.startswith("OK: 2 hunk(s)")
+    assert arquivo.read_text(encoding="utf-8") == "um\nDOIS\nextra\ntres\nQUATRO\n"
+
+
+def test_patch_com_conflito_nao_altera_arquivo(projeto):
+    arquivo = projeto / "app.txt"
+    original = "linha atual\nsegunda\n"
+    arquivo.write_text(original, encoding="utf-8")
+    politica = permissao.Politica()
+    permissao.usar(politica)
+    comando = permissao.comando_de("aplicar_patch", {"caminho": "app.txt"})
+    politica.liberar(comando)
+    patch = """@@ -1,2 +1,2 @@
+-linha antiga
++linha nova
+ segunda
+"""
+
+    resultado = ferramentas.aplicar_patch("app.txt", patch)
+
+    assert "conflito" in resultado
+    assert "não alterado" in resultado
+    assert arquivo.read_text(encoding="utf-8") == original
+
+
+def test_patch_exige_autorizacao_de_uso_unico(projeto):
+    arquivo = projeto / "app.txt"
+    arquivo.write_text("antigo\n", encoding="utf-8")
+    permissao.usar(permissao.Politica())
+    patch = """@@ -1 +1 @@
+-antigo
++novo
+"""
+
+    resultado = ferramentas.aplicar_patch("app.txt", patch)
+
+    assert "não passou" in resultado
+    assert arquivo.read_text(encoding="utf-8") == "antigo\n"
+
+
+@pytest.mark.parametrize(
+    ("original", "patch", "esperado"),
+    [
+        (
+            "antigo",
+            "@@ -1 +1 @@\n-antigo\n\\ No newline at end of file\n+novo\n",
+            "novo\n",
+        ),
+        (
+            "antigo\n",
+            "@@ -1 +1 @@\n-antigo\n+novo\n\\ No newline at end of file\n",
+            "novo",
+        ),
+    ],
+)
+def test_patch_respeita_marcador_de_nova_linha(projeto, original, patch, esperado):
+    arquivo = projeto / "app.txt"
+    arquivo.write_text(original, encoding="utf-8")
+    politica = permissao.Politica()
+    permissao.usar(politica)
+    comando = permissao.comando_de("aplicar_patch", {"caminho": "app.txt"})
+    politica.liberar(comando)
+
+    resultado = ferramentas.aplicar_patch("app.txt", patch)
+
+    assert resultado.startswith("OK: 1 hunk(s)")
+    assert arquivo.read_text(encoding="utf-8") == esperado
+
+
 def test_comando_nao_chega_ao_subprocess_sem_autorizacao(projeto, monkeypatch):
     executar = Mock(return_value=Mock(stdout="ok\n", stderr="", returncode=0))
     monkeypatch.setattr(ferramentas.subprocess, "run", executar)

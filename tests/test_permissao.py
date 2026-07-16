@@ -17,6 +17,7 @@ def projeto(tmp_path, monkeypatch):
     [
         ("escrever_arquivo", "caminho"),
         ("editar_arquivo", "caminho"),
+        ("aplicar_patch", "caminho"),
         ("criar_planilha", "nome"),
         ("criar_pdf", "nome"),
     ],

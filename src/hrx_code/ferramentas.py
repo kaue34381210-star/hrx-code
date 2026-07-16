@@ -2,7 +2,9 @@
 import os
 import glob
 import json
+import re
 import shlex
+import tempfile
 import datetime
 import subprocess
 
@@ -194,6 +196,109 @@ def editar_arquivo(caminho: str, procurar: str, substituir: str) -> str:
     with open(alvo, "w", encoding="utf-8") as f:
         f.write(texto.replace(procurar, substituir))
     return f"OK: {n} ocorrência(s) substituída(s) em {alvo}"
+
+
+_HUNK_PATCH = re.compile(
+    r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$"
+)
+
+
+def aplicar_patch(caminho: str, patch: str) -> str:
+    """Aplica hunks de um diff unificado a um arquivo de forma atômica."""
+    comando = permissao.comando_de("aplicar_patch", {"caminho": caminho})
+    if not permissao.consumir(comando):
+        return "ERRO: patch não passou pela aprovação de risco (trinco de segurança)."
+    alvo = _resolver_alvo(caminho)
+    if not os.path.isfile(alvo):
+        return f"ERRO: arquivo não existe: {alvo}"
+    with open(alvo, "r", encoding="utf-8", errors="replace", newline="") as f:
+        texto = f.read()
+
+    origem = texto.splitlines()
+    linhas_patch = str(patch or "").splitlines()
+    hunks = []
+    atual = None
+    saida_sem_nova_linha = not texto.endswith(("\n", "\r"))
+    antiga_sem_nova_linha = False
+    ultimo_marcador = None
+    for numero, linha in enumerate(linhas_patch, 1):
+        cabecalho = _HUNK_PATCH.match(linha)
+        if cabecalho:
+            if atual is not None:
+                hunks.append(atual)
+            antigo_inicio = int(cabecalho.group(1))
+            antigo_total = int(cabecalho.group(2) or 1)
+            novo_total = int(cabecalho.group(4) or 1)
+            atual = {
+                "linha": numero,
+                "inicio": antigo_inicio - 1 if antigo_total else antigo_inicio,
+                "antigo_total": antigo_total,
+                "novo_total": novo_total,
+                "antigas": [],
+                "novas": [],
+            }
+            continue
+        if atual is None:
+            if not linha or linha.startswith(("--- ", "+++ ")):
+                continue
+            return f"ERRO: patch inválido na linha {numero}: esperado cabeçalho @@"
+        if linha.startswith("\\ No newline at end of file"):
+            if ultimo_marcador in "+ ":
+                saida_sem_nova_linha = True
+            elif ultimo_marcador == "-":
+                antiga_sem_nova_linha = True
+            continue
+        if not linha or linha[0] not in " +-":
+            return f"ERRO: patch inválido na linha {numero}: marcador desconhecido"
+        marcador, conteudo = linha[0], linha[1:]
+        if marcador == "+" and antiga_sem_nova_linha:
+            saida_sem_nova_linha = False
+            antiga_sem_nova_linha = False
+        if marcador in " -":
+            atual["antigas"].append(conteudo)
+        if marcador in " +":
+            atual["novas"].append(conteudo)
+        ultimo_marcador = marcador
+    if atual is not None:
+        hunks.append(atual)
+    if not hunks:
+        return "ERRO: patch não contém nenhum hunk @@"
+
+    resultado = []
+    cursor = 0
+    for hunk in hunks:
+        inicio = hunk["inicio"]
+        antigas = hunk["antigas"]
+        novas = hunk["novas"]
+        if len(antigas) != hunk["antigo_total"] or len(novas) != hunk["novo_total"]:
+            return f"ERRO: contagem inválida no hunk da linha {hunk['linha']}"
+        if inicio < cursor or inicio > len(origem):
+            return f"ERRO: posição inválida no hunk da linha {hunk['linha']}"
+        if origem[inicio:inicio + len(antigas)] != antigas:
+            return f"ERRO: conflito no hunk da linha {hunk['linha']}; arquivo não alterado"
+        resultado.extend(origem[cursor:inicio])
+        resultado.extend(novas)
+        cursor = inicio + len(antigas)
+    resultado.extend(origem[cursor:])
+
+    quebra = "\r\n" if "\r\n" in texto else "\r" if "\r" in texto else "\n"
+    novo_texto = quebra.join(resultado)
+    if resultado and not saida_sem_nova_linha:
+        novo_texto += quebra
+    temporario = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", newline="", dir=os.path.dirname(alvo),
+            prefix=".hrx-patch-", delete=False,
+        ) as f:
+            temporario = f.name
+            f.write(novo_texto)
+        os.chmod(temporario, os.stat(alvo).st_mode & 0o777)
+        os.replace(temporario, alvo)
+    finally:
+        if temporario and os.path.exists(temporario):
+            os.unlink(temporario)
+    return f"OK: {len(hunks)} hunk(s) aplicado(s) em {alvo}"
 
 
 def criar_planilha(nome: str, dados: list, cabecalho: list = None) -> str:
@@ -758,6 +863,7 @@ REGISTRO = {
     "ler_arquivo": ler_arquivo,
     "escrever_arquivo": escrever_arquivo,
     "editar_arquivo": editar_arquivo,
+    "aplicar_patch": aplicar_patch,
     "listar_diretorio": listar_diretorio,
     "buscar_codigo": buscar_codigo,
     "criar_planilha": criar_planilha,

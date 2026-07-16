@@ -10,16 +10,18 @@ COMANDO_DE_FERRAMENTA = {
     "git": lambda a: ("git " + str((a or {}).get("args", ""))).strip(),
     "escrever_arquivo": lambda a: f"escrever_arquivo {(a or {}).get('caminho', '')}".strip(),
     "editar_arquivo": lambda a: f"editar_arquivo {(a or {}).get('caminho', '')}".strip(),
+    "aplicar_patch": lambda a: f"aplicar_patch {(a or {}).get('caminho', '')}".strip(),
     "criar_planilha": lambda a: f"criar_planilha {(a or {}).get('nome', '')}".strip(),
     "criar_pdf": lambda a: f"criar_pdf {(a or {}).get('nome', '')}".strip(),
 }
 
-FERRAMENTAS_ESCRITA = {"escrever_arquivo", "editar_arquivo",
+FERRAMENTAS_ESCRITA = {"escrever_arquivo", "editar_arquivo", "aplicar_patch",
                        "criar_planilha", "criar_pdf"}
 
 CAMPO_CAMINHO = {
     "escrever_arquivo": "caminho",
     "editar_arquivo": "caminho",
+    "aplicar_patch": "caminho",
     "criar_planilha": "nome",
     "criar_pdf": "nome",
 }
