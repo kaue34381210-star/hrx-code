@@ -6,7 +6,7 @@
 
 [![Tests](https://github.com/kaue34381210-star/hrx-code/actions/workflows/tests.yml/badge.svg)](https://github.com/kaue34381210-star/hrx-code/actions/workflows/tests.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/version-v0.1.0-00bcd4)](https://github.com/kaue34381210-star/hrx-code/releases/tag/v0.1.0)
+[![Version](https://img.shields.io/badge/version-v0.1.1-00bcd4)](https://github.com/kaue34381210-star/hrx-code/releases/tag/v0.1.1)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 <img src="docs/demo.gif" alt="Demonstração do HRX Code analisando um projeto e bloqueando um comando destrutivo" width="900">
@@ -116,11 +116,16 @@ resposta final.
 
 ## Capacidades
 
-- Navegação, leitura, busca e edição de código com números de linha e aplicação
-  atômica de patches unificados com detecção de conflitos.
+- Navegação e busca de código com números de linha, contexto configurável e
+  filtros do `.gitignore` da raiz e do `.hrxignore` privado.
+- Leitura que recusa binários detectados e informa truncamento; edição literal
+  por ocorrência, edição de todas as ocorrências e aplicação atômica de patches.
+- Undo transacional das mutações de arquivo, com seleção opcional por caminho e
+  proteção contra sobrescrever alterações posteriores.
 - Fluxo de engenharia que lê o contexto antes de editar, preserva mudanças do
   usuário e valida o resultado com os testes e verificações definidos no projeto.
-- Execução de shell e operações Git no diretório do projeto.
+- Execução de shell e operações Git no diretório do projeto, sempre informando
+  o código de saída e eventual truncamento da resposta.
 - Criação de planilhas Excel e documentos PDF.
 - Consulta de CVEs na API do NVD e leitura de páginas públicas.
 - Memória persistente com modo compacto para economizar contexto.
@@ -128,8 +133,8 @@ resposta final.
 - Perfis configuráveis com nome, tom, idioma e projeto atual.
 
 Comandos úteis no chat: `/config`, `/perfil`, `/motor`, `/modo`, `/dry-run`,
-`/permissoes`, `/memoria`, `/comandos`, `/debug`, `/resumo`, `/novo`, `/ajuda`
-e `/sair`.
+`/undo [caminho]`, `/permissoes`, `/memoria`, `/comandos`, `/debug`, `/resumo`,
+`/novo`, `/ajuda` e `/sair`.
 
 ## Segurança
 
@@ -143,6 +148,12 @@ e `/sair`.
   executores dinâmicos, cadeias e código inline.
 - Ferramentas sensíveis exigem uma autorização de uso único correspondente ao
   comando aprovado.
+- O undo é sempre classificado como alto risco, inclusive no modo automático,
+  e recusa a operação se conteúdo ou metadados mudaram desde a mutação gravada.
+- Snapshots de undo ficam fora do projeto, em armazenamento privado, e nunca
+  entram nas ferramentas de listagem, busca ou documentos.
+- Listagens e buscas respeitam as regras de ignore por padrão e nunca percorrem
+  diretórios internos pesados como `.git`, `.venv` e `node_modules`.
 - O modo `/dry-run on` mantém leituras ativas, mas apenas classifica e descreve
   ferramentas sensíveis sem executá-las. Também pode iniciar ativo com
   `HRX_DRY_RUN=1`.
@@ -161,7 +172,7 @@ python -m pip install -e ".[dev]"
 python -m pytest
 ```
 
-A suíte possui 100 testes, cobre atualmente 50% do pacote e roda no GitHub
+A suíte possui 175 testes, cobre atualmente cerca de 62% do pacote e roda no GitHub
 Actions com Python 3.10, 3.11, 3.12 e 3.13. O CI exige no mínimo 40% de
 cobertura. Para recriar a demonstração do README, instale o FFmpeg e execute:
 
@@ -178,6 +189,8 @@ src/hrx_code/
 ├── permissao.py       política da sessão e autorização de uso único
 ├── aprovacao.py       classificação heurística de risco
 ├── caminhos.py        resolução canônica e isolamento de diretórios
+├── gitignore.py       regras públicas e privadas de exclusão nas buscas
+├── undo.py            snapshots transacionais e restauração segura
 ├── gemini.py          cliente Gemini e rotação de chaves
 ├── openai_compat.py   OpenAI, DeepSeek, Groq e Ollama
 ├── claude.py          adaptador para Anthropic Messages

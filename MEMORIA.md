@@ -6,6 +6,33 @@ comportamento, os comandos ou a configuração mudarem.
 
 ## Mudanças recentes
 
+- A versão 0.1.1 adiciona undo transacional às mutações de arquivos. A operação
+  só entra no histórico depois de a escrita terminar e o estado posterior ser
+  confirmado; falhas abortam a transação e preservam ou restauram o original.
+- Antes de desfazer, o motor compara o hash SHA-256 e os metadados registrados
+  após a mutação (modo, `mtime`, dispositivo e inode). Divergências são tratadas
+  como conflito: nada é sobrescrito e a operação permanece disponível.
+- Snapshots e o histórico de undo ficam em `~/.config/hrx/dados/undo/` por
+  padrão, ou sob o diretório definido por `AGENTE_DADOS`, com diretório `0700`
+  e arquivos `0600` quando suportado. Esse caminho é sempre ocultado das
+  ferramentas de navegação e documentos; o histórico mantém até 50 operações
+  ou 100 MiB de snapshots.
+- `/undo [caminho]` e a ferramenta `desfazer_ultima` compartilham o mesmo fluxo
+  de autorização de uso único e são sempre risco vermelho, inclusive no modo
+  automático. O caminho opcional seleciona a mutação ativa mais recente dele.
+- `editar_arquivo` exige trecho literal inequívoco por padrão e agora aceita
+  `ocorrencia=N` ou `tudo=True`, opções mutuamente exclusivas validadas antes de
+  criar o snapshot da transação.
+- `listar_diretorio` e `buscar_codigo` respeitam o `.gitignore` da raiz e o
+  `.hrxignore` privado, com cache invalidado por `mtime` e tamanho. Arquivos
+  `.gitignore` aninhados não são interpretados; diretórios internos pesados
+  permanecem excluídos quando `respeitar_gitignore=False`.
+- `buscar_codigo` ganhou linhas de contexto com agrupamento de intervalos;
+  arquivos binários são recusados por assinatura, NUL ou controles sem penalizar
+  UTF-8 acentuado. Leitura, shell e Git informam truncamento, e os dois últimos
+  sempre retornam o código de saída.
+- A preferência de `/memoria modo compacta|completa` passou a ser lida da
+  configuração persistente, mantendo a precedência da variável de ambiente.
 - Adicionada a ferramenta `aplicar_patch`, que aplica hunks de diff unificado a
   um arquivo por vez, valida contexto e contagens antes da escrita, rejeita
   conflitos sem alteração parcial e usa o mesmo trinco de autorização das
@@ -28,7 +55,7 @@ comportamento, os comandos ou a configuração mudarem.
 - Testes avulsos migrados para uma suíte `pytest`, com execução automática no
   GitHub Actions em Python 3.10 a 3.13 e dependências declaradas em arquivos
   `requirements`.
-- Suíte ampliada para 100 testes e cobertura automatizada com `pytest-cov`;
+- Suíte ampliada para 175 testes e cerca de 62% de cobertura com `pytest-cov`;
   comandos, memória, ferramentas e provedores agora têm testes dedicados, e o
   CI rejeita cobertura total abaixo de 40%.
 - Classificador de risco agora tokeniza e normaliza comandos shell, bloqueando
