@@ -48,8 +48,8 @@ AUTONOMIA E ESCOPO:
 - Nunca exponha, registre ou inclua segredos, chaves e tokens em código ou Git.
 
 Ferramentas de arquivo (agem no PROJETO real, com números de linha):
-- listar_diretorio(caminho, recursivo)  lista arquivos ("." = raiz do projeto); recursivo=True mostra a árvore
-- buscar_codigo(padrao, caminho, ext, contexto=0)  procura texto/regex nos arquivos (tipo grep -rn); contexto inclui linhas antes/depois; ex: buscar_codigo("def main", ext=".py", contexto=2)
+- listar_diretorio(caminho, recursivo, respeitar_gitignore=True)  lista arquivos ("." = raiz do projeto); recursivo=True mostra a árvore; false inclui arquivos ignorados, exceto diretórios internos pesados
+- buscar_codigo(padrao, caminho, ext, contexto=0, respeitar_gitignore=True)  procura texto/regex nos arquivos; contexto inclui linhas antes/depois; false busca também arquivos ignorados, exceto diretórios internos pesados
 - ler_arquivo(caminho, inicio, fim)    lê o arquivo; inicio/fim = intervalo de linhas (1-based), opcional
 - escrever_arquivo(caminho, conteudo)  cria/sobrescreve um arquivo; caminhos externos ao projeto exigem confirmação de alto risco
 - editar_arquivo(caminho, procurar, substituir, ocorrencia=None, tudo=False)  substitui trecho literal; se houver várias ocorrências, escolha ocorrencia=N (1-based) ou tudo=True

@@ -10,12 +10,9 @@ import subprocess
 
 from . import caminhos
 from . import config
+from . import gitignore
 from . import permissao
 
-
-_IGNORAR = {".git", "node_modules", ".venv", "venv", "__pycache__",
-            ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build",
-            ".next", ".turbo", "target", ".idea", ".gradle"}
 
 _ASSINATURAS_BINARIAS = (
     (b"\x89PNG", "PNG"),
@@ -114,24 +111,40 @@ def escrever_arquivo(caminho: str, conteudo: str) -> str:
     return f"OK: {len(conteudo)} caracteres gravados em {alvo}"
 
 
-def listar_diretorio(caminho: str = ".", recursivo: bool = False) -> str:
-    """Lista o diretório do PROJETO. recursivo=True mostra a árvore (ignora
-    .git/node_modules/.venv/etc.)."""
+def listar_diretorio(caminho: str = ".", recursivo: bool = False,
+                     respeitar_gitignore: bool = True) -> str:
+    """Lista o diretório do PROJETO, respeitando ignores por padrão."""
+    if not isinstance(respeitar_gitignore, bool):
+        return "ERRO: respeitar_gitignore deve ser booleano (true ou false)"
     alvo = _dentro(config.REPO, caminho)
     if not os.path.isdir(alvo):
         return f"ERRO: diretório não existe: {caminho}"
     if not recursivo:
-        itens = [n + ("/" if os.path.isdir(os.path.join(alvo, n)) else "")
-                 for n in sorted(os.listdir(alvo))]
+        itens = []
+        for nome in sorted(os.listdir(alvo)):
+            item = os.path.join(alvo, nome)
+            diretorio = os.path.isdir(item)
+            if gitignore.deve_ignorar(item, diretorio, respeitar_gitignore):
+                continue
+            itens.append(nome + ("/" if diretorio else ""))
         return "\n".join(itens) if itens else "(vazio)"
     linhas = []
     for raiz, dirs, arqs in os.walk(alvo):
-        dirs[:] = sorted(d for d in dirs if d not in _IGNORAR)
+        dirs[:] = sorted(
+            d for d in dirs
+            if not gitignore.deve_ignorar(
+                os.path.join(raiz, d), True, respeitar_gitignore
+            )
+        )
         rel = os.path.relpath(raiz, alvo)
         nivel = 0 if rel == "." else rel.count(os.sep) + 1
         if rel != ".":
             linhas.append("  " * (nivel - 1) + os.path.basename(raiz) + "/")
-        for a in sorted(arqs):
+        for a in sorted(
+                nome for nome in arqs
+                if not gitignore.deve_ignorar(
+                    os.path.join(raiz, nome), False, respeitar_gitignore
+                )):
             linhas.append("  " * nivel + a)
         if len(linhas) > 400:
             linhas.append("...[truncado — projeto grande]")
@@ -140,7 +153,7 @@ def listar_diretorio(caminho: str = ".", recursivo: bool = False) -> str:
 
 
 def buscar_codigo(padrao: str, caminho: str = ".", ext: str = None,
-                  contexto: int = 0) -> str:
+                  contexto: int = 0, respeitar_gitignore: bool = True) -> str:
     """Procura texto/regex nos arquivos do PROJETO (tipo grep -rn). `ext` filtra
     a extensão (ex: '.py'). `contexto` inclui linhas antes e depois do match."""
     import re as _re
@@ -148,6 +161,8 @@ def buscar_codigo(padrao: str, caminho: str = ".", ext: str = None,
         return "ERRO: contexto deve ser um inteiro maior ou igual a 0"
     if contexto < 0:
         return "ERRO: contexto deve ser maior ou igual a 0"
+    if not isinstance(respeitar_gitignore, bool):
+        return "ERRO: respeitar_gitignore deve ser booleano (true ou false)"
     base = _dentro(config.REPO, caminho)
     if not os.path.exists(base):
         return f"ERRO: caminho não existe: {caminho}"
@@ -170,12 +185,21 @@ def buscar_codigo(padrao: str, caminho: str = ".", ext: str = None,
 
     def arquivos():
         if os.path.isfile(base):
-            yield base
+            if not gitignore.deve_ignorar(base, False, respeitar_gitignore):
+                yield base
             return
         for raiz, dirs, arqs in os.walk(base):
-            dirs[:] = [d for d in dirs if d not in _IGNORAR]
+            dirs[:] = [
+                d for d in dirs
+                if not gitignore.deve_ignorar(
+                    os.path.join(raiz, d), True, respeitar_gitignore
+                )
+            ]
             for a in sorted(arqs):
-                yield os.path.join(raiz, a)
+                arquivo = os.path.join(raiz, a)
+                if not gitignore.deve_ignorar(
+                        arquivo, False, respeitar_gitignore):
+                    yield arquivo
 
     limite_exibicao = 100
     limite_contagem = 500
