@@ -41,8 +41,9 @@ comportamento, os comandos ou a configuração mudarem.
   `hrx-qwen`).
 - O `run.sh` executa o pacote com `.venv/bin/python -m hrx_code`; instalações
   usam o ponto de entrada `hrx_code.agente:main`.
-- Licença definida como **proprietária de uso gratuito** (`LICENSE`): livre para
-  usar e compartilhar cópias exatas, proibido modificar ou vender. Não é OSS.
+- Licença **MIT** (`LICENSE`): livre para usar, modificar, distribuir e uso
+  comercial, mantendo o aviso de copyright. Migrado de licença proprietária de
+  uso gratuito para OSS em 2026-07-17.
 - Adicionado `/perfil` (nome, tom, idioma, projeto) persistido em
   `~/.config/hrx/perfil.json`.
 - Adicionado `/config` para escolher e persistir o motor de IA.

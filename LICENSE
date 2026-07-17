@@ -1,37 +1,21 @@
-HRX CODE — Licença de Uso
-Copyright (c) 2026 Kauê. Todos os direitos reservados.
+MIT License
 
-Este software ("HRX CODE") é disponibilizado gratuitamente, mas NÃO é
-software de código aberto. O uso está sujeito aos termos abaixo.
+Copyright (c) 2026 Kauê
 
-1. USO PERMITIDO
-   Você pode baixar, instalar, executar e usar o HRX CODE gratuitamente,
-   para fins pessoais ou internos (inclusive dentro de uma empresa), sem
-   pagar nada ao autor.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-2. REDISTRIBUIÇÃO
-   Você pode compartilhar cópias EXATAS e não modificadas do software,
-   desde que gratuitamente, mantendo este arquivo LICENSE e os créditos
-   ao autor original intactos.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-3. RESTRIÇÕES (o que NÃO é permitido)
-   a) MODIFICAR, adaptar, traduzir, refatorar ou criar obras derivadas do
-      software, no todo ou em parte;
-   b) VENDER, licenciar, sublicenciar, alugar, cobrar por, ou explorar
-      comercialmente o software ou qualquer parte dele;
-   c) Remover ou alterar avisos de copyright, autoria ou esta licença;
-   d) Reivindicar autoria do software.
-
-4. RESERVA DE DIREITOS
-   Todos os direitos não expressamente concedidos aqui permanecem com o
-   autor. Qualquer uso fora destes termos exige autorização por escrito do
-   autor.
-
-5. ISENÇÃO DE GARANTIA
-   O SOFTWARE É FORNECIDO "COMO ESTÁ", SEM GARANTIAS DE QUALQUER TIPO,
-   EXPRESSAS OU IMPLÍCITAS. EM NENHUMA HIPÓTESE O AUTOR SERÁ RESPONSÁVEL
-   POR QUAISQUER DANOS DECORRENTES DO USO OU DA IMPOSSIBILIDADE DE USO
-   DESTE SOFTWARE.
-
-Para permissões além destes termos (modificação, uso comercial, venda),
-entre em contato com o autor.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

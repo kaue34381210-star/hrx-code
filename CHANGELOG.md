@@ -6,6 +6,8 @@ Todas as mudanças relevantes do HRX Code serão registradas neste arquivo.
 
 ### Alterado
 
+- Licença migrada de proprietária de uso gratuito para **MIT** — projeto agora
+  é open source (livre para usar, modificar, distribuir e uso comercial).
 - Código-fonte migrado para o pacote `src/hrx_code` com imports relativos.
 - CLI também pode ser iniciada com `python -m hrx_code`.
 - Testes atualizados para validar a API do pacote e o novo ponto de entrada.

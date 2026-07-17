@@ -7,7 +7,7 @@
 [![Tests](https://github.com/kaue34381210-star/hrx-code/actions/workflows/tests.yml/badge.svg)](https://github.com/kaue34381210-star/hrx-code/actions/workflows/tests.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-v0.1.0-00bcd4)](https://github.com/kaue34381210-star/hrx-code/releases/tag/v0.1.0)
-[![License](https://img.shields.io/badge/license-proprietary-8b0000)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 <img src="docs/demo.gif" alt="Demonstração do HRX Code analisando um projeto e bloqueando um comando destrutivo" width="900">
 
@@ -191,7 +191,7 @@ e o histórico de versões está em [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Licença
 
-Uso gratuito sob licença proprietária: cópias exatas podem ser compartilhadas,
-mas modificações e venda não são permitidas. Consulte [`LICENSE`](LICENSE).
+MIT — livre para usar, modificar, distribuir e uso comercial, mantendo o aviso
+de copyright. Consulte [`LICENSE`](LICENSE).
 
-© 2026 Kauê. Todos os direitos reservados.
+© 2026 Kauê.
