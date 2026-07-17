@@ -46,6 +46,15 @@ def test_le_intervalo_com_numeros_de_linha(projeto):
     assert "1\tum" not in resultado
 
 
+def test_le_arquivo_reporta_truncamento_exato(projeto):
+    (projeto / "grande.txt").write_text("x" * 21000, encoding="utf-8")
+
+    resultado = ferramentas.ler_arquivo("grande.txt")
+
+    # O prefixo de numeração ("1\t") também faz parte do corpo retornado.
+    assert "truncado: 1002 chars omitidos de 21002 totais" in resultado
+
+
 def test_escrita_exige_e_consome_autorizacao(projeto):
     politica = permissao.Politica()
     permissao.usar(politica)
@@ -181,9 +190,71 @@ def test_comando_nao_chega_ao_subprocess_sem_autorizacao(projeto, monkeypatch):
     permitido = ferramentas.rodar_comando("echo ok")
 
     assert "não passou" in negado
-    assert permitido == "ok"
+    assert permitido == "ok\n[código de saída: 0]"
     assert executar.call_args.kwargs["cwd"] == str(projeto)
     assert executar.call_args.kwargs["shell"] is True
+
+
+def test_comando_reporta_truncamento_e_codigo_de_erro(projeto, monkeypatch):
+    executar = Mock(return_value=Mock(
+        stdout="x" * 9000,
+        stderr="falhou",
+        returncode=7,
+    ))
+    monkeypatch.setattr(ferramentas.subprocess, "run", executar)
+    politica = permissao.Politica()
+    permissao.usar(politica)
+    politica.liberar("comando grande")
+
+    resultado = ferramentas.rodar_comando("comando grande")
+
+    assert "truncado: 1006 chars omitidos de 9006 totais" in resultado
+    assert resultado.endswith("[código de saída: 7]")
+
+
+def test_git_reporta_saida_truncada_e_codigo(projeto, monkeypatch):
+    (projeto / ".git").mkdir()
+    executar = Mock(return_value=Mock(
+        stdout="y" * 8100,
+        stderr="",
+        returncode=1,
+    ))
+    monkeypatch.setattr(ferramentas.subprocess, "run", executar)
+    politica = permissao.Politica()
+    permissao.usar(politica)
+    politica.liberar("git status")
+
+    resultado = ferramentas.git("status")
+
+    assert "truncado: 100 chars omitidos de 8100 totais" in resultado
+    assert resultado.endswith("[código de saída: 1]")
+    executar.assert_called_once_with(
+        ["git", "status"],
+        cwd=str(projeto),
+        capture_output=True,
+        text=True,
+        timeout=config.TIMEOUT_COMANDO,
+    )
+
+
+def test_busca_reporta_total_real_acima_do_limite(projeto):
+    arquivo = projeto / "muitos.txt"
+    arquivo.write_text("\n".join(["ACHADO"] * 137), encoding="utf-8")
+
+    resultado = ferramentas.buscar_codigo("ACHADO")
+
+    assert len([linha for linha in resultado.splitlines()
+                if linha.startswith("muitos.txt:")]) == 100
+    assert "37 resultados omitidos; 137 resultados no total" in resultado
+
+
+def test_busca_limita_contagem_e_informa_total_minimo(projeto):
+    arquivo = projeto / "muitos.txt"
+    arquivo.write_text("\n".join(["ACHADO"] * 600), encoding="utf-8")
+
+    resultado = ferramentas.buscar_codigo("ACHADO")
+
+    assert "ao menos 401 resultados omitidos; 500+ resultados no total" in resultado
 
 
 def test_dispatcher_trata_nome_e_argumentos_invalidos():

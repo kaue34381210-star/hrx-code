@@ -35,6 +35,15 @@ def _arquivo_resumo() -> str:
     return os.path.join(config.DADOS, "memoria_resumo.txt")
 
 
+def _truncar(texto: str, limite: int, unidade: str = "chars") -> str:
+    """Trunca texto e informa exatamente o volume omitido."""
+    if len(texto) <= limite:
+        return texto
+    omitidos = len(texto) - limite
+    return (f"{texto[:limite]}\n...[truncado: {omitidos} {unidade} omitidos "
+            f"de {len(texto)} totais]")
+
+
 def ler_arquivo(caminho: str, inicio: int = None, fim: int = None) -> str:
     """Lê um arquivo do PROJETO (config.REPO). Opcional: intervalo de linhas
     [inicio, fim] (1-based). Retorna com números de linha p/ facilitar edições."""
@@ -49,7 +58,7 @@ def ler_arquivo(caminho: str, inicio: int = None, fim: int = None) -> str:
     largura = len(str(f_)) or 1
     corpo = "".join(f"{ini + i:>{largura}}\t{l}"
                     for i, l in enumerate(linhas[ini - 1:f_]))
-    corpo = corpo[:20000] + ("\n...[truncado]" if len(corpo) > 20000 else "")
+    corpo = _truncar(corpo, 20000)
     return f"# {caminho} (linhas {ini}-{f_} de {total})\n{corpo}"
 
 
@@ -123,15 +132,31 @@ def buscar_codigo(padrao: str, caminho: str = ".", ext: str = None) -> str:
             for a in sorted(arqs):
                 yield os.path.join(raiz, a)
 
+    limite_exibicao = 100
+    limite_contagem = 500
     achados = []
+    total = 0
+    contagem_incompleta = False
     for fp in arquivos():
         if ext and not fp.endswith(ext):
             continue
         for hit in varrer(fp):
-            achados.append(hit)
-            if len(achados) >= 100:
-                achados.append("...[mais de 100 resultados — refine a busca]")
-                return "\n".join(achados)
+            total += 1
+            if len(achados) < limite_exibicao:
+                achados.append(hit)
+            if total > limite_contagem:
+                contagem_incompleta = True
+                break
+        if contagem_incompleta:
+            break
+    if total > limite_exibicao:
+        total_txt = f"{limite_contagem}+" if contagem_incompleta else str(total)
+        omitidos_txt = (f"ao menos {limite_contagem + 1 - limite_exibicao}"
+                        if contagem_incompleta else str(total - limite_exibicao))
+        achados.append(
+            f"...[truncado: {omitidos_txt} resultados omitidos; "
+            f"{total_txt} resultados no total — refine a busca]"
+        )
     return "\n".join(achados) if achados else f"Nada encontrado para: {padrao}"
 
 
@@ -150,7 +175,8 @@ def rodar_comando(comando: str) -> str:
     except subprocess.TimeoutExpired:
         return f"ERRO: comando estourou {config.TIMEOUT_COMANDO}s"
     saida = (r.stdout + r.stderr).strip()
-    return saida[:8000] if saida else f"(sem saída, código {r.returncode})"
+    saida = _truncar(saida, 8000) if saida else "(sem saída)"
+    return f"{saida}\n[código de saída: {r.returncode}]"
 
 
 def git(args: str = "") -> str:
@@ -177,7 +203,8 @@ def git(args: str = "") -> str:
     except subprocess.TimeoutExpired:
         return f"ERRO: git estourou {config.TIMEOUT_COMANDO}s"
     saida = (r.stdout + r.stderr).strip()
-    return saida[:8000] if saida else f"(sem saída, código {r.returncode})"
+    saida = _truncar(saida, 8000) if saida else "(sem saída)"
+    return f"{saida}\n[código de saída: {r.returncode}]"
 
 
 def editar_arquivo(caminho: str, procurar: str, substituir: str) -> str:
