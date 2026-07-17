@@ -17,6 +17,17 @@ _IGNORAR = {".git", "node_modules", ".venv", "venv", "__pycache__",
             ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build",
             ".next", ".turbo", "target", ".idea", ".gradle"}
 
+_ASSINATURAS_BINARIAS = (
+    (b"\x89PNG", "PNG"),
+    (b"%PDF", "PDF"),
+    (b"PK\x03\x04", "ZIP/container"),
+    (b"PK\x05\x06", "ZIP/container"),
+    (b"PK\x07\x08", "ZIP/container"),
+    (b"\x7fELF", "ELF"),
+)
+_BYTES_CONTROLE = frozenset(range(32)) - {9, 10, 13}
+_BYTES_CONTROLE = _BYTES_CONTROLE | {127}
+
 
 def _dentro(base: str, caminho: str) -> str:
     return caminhos.exigir_dentro(base, caminho)
@@ -44,12 +55,39 @@ def _truncar(texto: str, limite: int, unidade: str = "chars") -> str:
             f"de {len(texto)} totais]")
 
 
+def _tipo_binario(amostra: bytes, caminho: str) -> str | None:
+    """Detecta binário por assinatura, NUL ou alta proporção de controles.
+
+    Um único NUL é suficiente. Bytes >= 128 não contam como controles para que
+    texto UTF-8 (inclusive acentuado) não seja classificado como binário.
+    """
+    for assinatura, tipo in _ASSINATURAS_BINARIAS:
+        if amostra.startswith(assinatura):
+            return tipo
+    if b"\x00" not in amostra and amostra:
+        controles = sum(byte in _BYTES_CONTROLE for byte in amostra)
+        if controles / len(amostra) <= 0.30:
+            return None
+    elif b"\x00" not in amostra:
+        return None
+
+    extensao = os.path.splitext(caminho)[1].lstrip(".")
+    return extensao.upper() if extensao else "desconhecido"
+
+
 def ler_arquivo(caminho: str, inicio: int = None, fim: int = None) -> str:
     """Lê um arquivo do PROJETO (config.REPO). Opcional: intervalo de linhas
     [inicio, fim] (1-based). Retorna com números de linha p/ facilitar edições."""
     alvo = _dentro(config.REPO, caminho)
     if not os.path.isfile(alvo):
         return f"ERRO: arquivo não existe: {caminho}"
+    tamanho = os.path.getsize(alvo)
+    with open(alvo, "rb") as f:
+        amostra = f.read(8192)
+    tipo = _tipo_binario(amostra, caminho)
+    if tipo:
+        return (f"ERRO: arquivo binário ({tamanho} bytes, tipo detectado: "
+                f"{tipo}). Use ferramentas específicas se precisar do conteúdo.")
     with open(alvo, "r", encoding="utf-8", errors="replace") as f:
         linhas = f.readlines()
     total = len(linhas)
