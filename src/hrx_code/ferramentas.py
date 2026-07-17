@@ -139,10 +139,15 @@ def listar_diretorio(caminho: str = ".", recursivo: bool = False) -> str:
     return "\n".join(linhas) if linhas else "(vazio)"
 
 
-def buscar_codigo(padrao: str, caminho: str = ".", ext: str = None) -> str:
+def buscar_codigo(padrao: str, caminho: str = ".", ext: str = None,
+                  contexto: int = 0) -> str:
     """Procura texto/regex nos arquivos do PROJETO (tipo grep -rn). `ext` filtra
-    a extensão (ex: '.py'). Retorna 'arquivo:linha: trecho'."""
+    a extensão (ex: '.py'). `contexto` inclui linhas antes e depois do match."""
     import re as _re
+    if isinstance(contexto, bool) or not isinstance(contexto, int):
+        return "ERRO: contexto deve ser um inteiro maior ou igual a 0"
+    if contexto < 0:
+        return "ERRO: contexto deve ser maior ou igual a 0"
     base = _dentro(config.REPO, caminho)
     if not os.path.exists(base):
         return f"ERRO: caminho não existe: {caminho}"
@@ -154,10 +159,12 @@ def buscar_codigo(padrao: str, caminho: str = ".", ext: str = None) -> str:
     def varrer(fp):
         try:
             with open(fp, "r", encoding="utf-8", errors="ignore") as f:
-                for n, linha in enumerate(f, 1):
+                linhas = f.readlines() if contexto else None
+                conteudo = linhas if linhas is not None else f
+                for n, linha in enumerate(conteudo, 1):
                     if rx.search(linha):
                         rel = os.path.relpath(fp, config.REPO)
-                        yield f"{rel}:{n}: {linha.strip()[:200]}"
+                        yield rel, n, linha, linhas
         except OSError:
             return
 
@@ -178,24 +185,64 @@ def buscar_codigo(padrao: str, caminho: str = ".", ext: str = None) -> str:
     for fp in arquivos():
         if ext and not fp.endswith(ext):
             continue
-        for hit in varrer(fp):
+        for rel, numero, linha, linhas in varrer(fp):
             total += 1
             if len(achados) < limite_exibicao:
-                achados.append(hit)
+                achados.append((rel, numero, linha, linhas))
             if total > limite_contagem:
                 contagem_incompleta = True
                 break
         if contagem_incompleta:
             break
+
+    if contexto:
+        grupos_por_arquivo = {}
+        for rel, numero, _, linhas in achados:
+            grupo = grupos_por_arquivo.setdefault(
+                rel, {"linhas": linhas, "matches": []}
+            )
+            grupo["matches"].append(numero)
+
+        grupos_saida = []
+        for rel, dados in grupos_por_arquivo.items():
+            linhas = dados["linhas"]
+            matches = dados["matches"]
+            intervalos = []
+            for numero in matches:
+                inicio = max(1, numero - contexto)
+                fim = min(len(linhas), numero + contexto)
+                if intervalos and inicio <= intervalos[-1][1] + 1:
+                    intervalos[-1][1] = max(intervalos[-1][1], fim)
+                else:
+                    intervalos.append([inicio, fim])
+
+            numeros_match = set(matches)
+            for inicio, fim in intervalos:
+                trecho = []
+                for numero in range(inicio, fim + 1):
+                    separador = ":" if numero in numeros_match else "-"
+                    conteudo = linhas[numero - 1].strip()[:200]
+                    trecho.append(
+                        f"{rel}{separador}{numero}{separador} {conteudo}"
+                    )
+                grupos_saida.append("\n".join(trecho))
+        saida = "\n--\n".join(grupos_saida)
+    else:
+        saida = "\n".join(
+            f"{rel}:{numero}: {linha.strip()[:200]}"
+            for rel, numero, linha, _ in achados
+        )
+
     if total > limite_exibicao:
         total_txt = f"{limite_contagem}+" if contagem_incompleta else str(total)
         omitidos_txt = (f"ao menos {limite_contagem + 1 - limite_exibicao}"
                         if contagem_incompleta else str(total - limite_exibicao))
-        achados.append(
+        aviso = (
             f"...[truncado: {omitidos_txt} resultados omitidos; "
             f"{total_txt} resultados no total — refine a busca]"
         )
-    return "\n".join(achados) if achados else f"Nada encontrado para: {padrao}"
+        saida = f"{saida}\n{aviso}"
+    return saida if achados else f"Nada encontrado para: {padrao}"
 
 
 def rodar_comando(comando: str) -> str:
