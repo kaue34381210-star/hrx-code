@@ -12,6 +12,7 @@ BUILTIN = frozenset({
     "/dry-run", "/dryrun", "/simular",
     "/memoria", "/memorias", "/motor", "/chaves", "/limpar",
     "/comandos", "/resumo",
+    "/undo",
 })
 
 _CHAVES_DESC = ("descricao", "descrição", "desc", "description")

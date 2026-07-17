@@ -8,8 +8,10 @@ from hrx_code import permissao
 @pytest.fixture
 def arquivo(tmp_path, monkeypatch):
     raiz = tmp_path / "projeto"
+    dados = tmp_path / "dados"
     raiz.mkdir()
     monkeypatch.setattr(config, "REPO", str(raiz))
+    monkeypatch.setattr(config, "DADOS", str(dados))
     permissao.usar(permissao.Politica())
     alvo = raiz / "app.txt"
     yield alvo

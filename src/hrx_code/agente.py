@@ -54,6 +54,8 @@ Ferramentas de arquivo (agem no PROJETO real, com números de linha):
 - escrever_arquivo(caminho, conteudo)  cria/sobrescreve um arquivo; caminhos externos ao projeto exigem confirmação de alto risco
 - editar_arquivo(caminho, procurar, substituir, ocorrencia=None, tudo=False)  substitui trecho literal; se houver várias ocorrências, escolha ocorrencia=N (1-based) ou tudo=True
 - aplicar_patch(caminho, patch)  aplica hunks de diff unificado com detecção de conflito e escrita atômica
+- listar_undo(limite=10)  lista operações recentes disponíveis para desfazer
+- desfazer_ultima(caminho=None)  restaura a última mutação (opcionalmente de um caminho); sempre exige confirmação explícita de alto risco
 
 Outras ferramentas:
 - criar_planilha(nome, dados, cabecalho)  cria Excel .xlsx (caminhos externos exigem confirmação de alto risco)
@@ -560,6 +562,26 @@ def _comando_especial(motor_chamar, pool, pol: permissao.Politica, historico: li
     if cmd in ("/sair", "sair", "exit", "quit", "/quit"):
         console.print("[dim]até mais 👋[/dim]")
         raise SystemExit(0)
+    if partes and partes[0] == "/undo":
+        originais = entrada.strip().split(maxsplit=1)
+        caminho = originais[1].strip() if len(originais) > 1 else None
+        nome = "desfazer_ultima"
+        args = {"caminho": caminho} if caminho else {}
+        comando = permissao.comando_de(nome, args)
+        if pol.dry_run:
+            resultado = _simular_comando(pol, nome, comando, args)
+        else:
+            permitido, bloqueio = _aprovar_comando(
+                pol, comando, ferramenta=nome, args=args
+            )
+            if permitido:
+                pol.liberar(comando)
+                resultado = ferramentas.executar(nome, args)
+            else:
+                resultado = bloqueio
+        if resultado:
+            console.print(f"  {resultado}")
+        return True
     if cmd in ("/ajuda", "/help"):
         console.print(Panel(
             "[cyan]/motor[/cyan]       mostra qual motor está em uso\n"
@@ -570,6 +592,7 @@ def _comando_especial(motor_chamar, pool, pol: permissao.Politica, historico: li
             "[cyan]/resumo[/cyan]      resume a conversa atual\n"
             "[cyan]/modo[/cyan] [dim]<m>[/dim]   permissões: [dim]blindado · cauteloso · auto[/dim]\n"
             "[cyan]/dry-run[/cyan] [dim]<on|off>[/dim] simula ferramentas sensíveis\n"
+            "[cyan]/undo[/cyan] [dim][caminho][/dim] desfaz a última mutação (alto risco)\n"
             "[cyan]/permissoes[/cyan]  mostra modo e a lista 'sempre permitir'\n"
             "[cyan]/memoria[/cyan]     mostra o que o HRX CODE já lembra\n"
             "[cyan]/memoria modo[/cyan] mostra/troca o modo da memória\n"

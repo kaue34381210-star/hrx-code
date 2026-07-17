@@ -11,12 +11,15 @@ COMANDO_DE_FERRAMENTA = {
     "escrever_arquivo": lambda a: f"escrever_arquivo {(a or {}).get('caminho', '')}".strip(),
     "editar_arquivo": lambda a: f"editar_arquivo {(a or {}).get('caminho', '')}".strip(),
     "aplicar_patch": lambda a: f"aplicar_patch {(a or {}).get('caminho', '')}".strip(),
+    "desfazer_ultima": lambda a: f"desfazer_ultima {(a or {}).get('caminho', '')}".strip(),
     "criar_planilha": lambda a: f"criar_planilha {(a or {}).get('nome', '')}".strip(),
     "criar_pdf": lambda a: f"criar_pdf {(a or {}).get('nome', '')}".strip(),
 }
 
 FERRAMENTAS_ESCRITA = {"escrever_arquivo", "editar_arquivo", "aplicar_patch",
                        "criar_planilha", "criar_pdf"}
+
+FERRAMENTAS_SEMPRE_VERMELHAS = {"desfazer_ultima"}
 
 CAMPO_CAMINHO = {
     "escrever_arquivo": "caminho",
@@ -69,6 +72,9 @@ class Politica:
 
         Riscos vermelhos e escritas fora do projeto nunca são rebaixados.
         """
+        if ferramenta in FERRAMENTAS_SEMPRE_VERMELHAS:
+            return ("vermelho",
+                    "undo pode sobrescrever ou remover arquivo e nunca é rebaixável")
         if ferramenta in FERRAMENTAS_ESCRITA:
             campo = CAMPO_CAMINHO[ferramenta]
             informado = str((args or {}).get(campo, ""))

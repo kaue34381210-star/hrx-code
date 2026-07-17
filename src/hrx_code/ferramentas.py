@@ -12,6 +12,7 @@ from . import caminhos
 from . import config
 from . import gitignore
 from . import permissao
+from . import undo
 
 
 _ASSINATURAS_BINARIAS = (
@@ -103,11 +104,19 @@ def escrever_arquivo(caminho: str, conteudo: str) -> str:
     if not permissao.consumir(permissao.comando_de("escrever_arquivo", {"caminho": caminho})):
         return "ERRO: escrita não passou pela aprovação de risco (trinco de segurança)."
     alvo = _resolver_alvo(caminho)
+    if not isinstance(conteudo, str):
+        return "ERRO: 'conteudo' deve ser uma string"
     pasta = os.path.dirname(alvo)
     if pasta:
         os.makedirs(pasta, exist_ok=True)
-    with open(alvo, "w", encoding="utf-8") as f:
-        f.write(conteudo)
+    transacao = undo.iniciar_transacao(alvo, "escrever_arquivo")
+    try:
+        with open(alvo, "w", encoding="utf-8") as f:
+            f.write(conteudo)
+        undo.confirmar_transacao(transacao)
+    except Exception:
+        undo.abortar_transacao(transacao, restaurar=True)
+        raise
     return f"OK: {len(conteudo)} caracteres gravados em {alvo}"
 
 
@@ -368,8 +377,14 @@ def editar_arquivo(caminho: str, procurar: str, substituir: str,
         novo_texto = texto[:indice] + substituir + texto[indice + len(procurar):]
         substituidas = 1
 
-    with open(alvo, "w", encoding="utf-8") as f:
-        f.write(novo_texto)
+    transacao = undo.iniciar_transacao(alvo, "editar_arquivo")
+    try:
+        with open(alvo, "w", encoding="utf-8") as f:
+            f.write(novo_texto)
+        undo.confirmar_transacao(transacao)
+    except Exception:
+        undo.abortar_transacao(transacao, restaurar=True)
+        raise
     return f"OK: {substituidas} ocorrência(s) substituída(s) em {alvo}"
 
 
@@ -460,6 +475,7 @@ def aplicar_patch(caminho: str, patch: str) -> str:
     novo_texto = quebra.join(resultado)
     if resultado and not saida_sem_nova_linha:
         novo_texto += quebra
+    transacao = undo.iniciar_transacao(alvo, "aplicar_patch")
     temporario = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -470,6 +486,11 @@ def aplicar_patch(caminho: str, patch: str) -> str:
             f.write(novo_texto)
         os.chmod(temporario, os.stat(alvo).st_mode & 0o777)
         os.replace(temporario, alvo)
+        temporario = None
+        undo.confirmar_transacao(transacao)
+    except Exception:
+        undo.abortar_transacao(transacao, restaurar=True)
+        raise
     finally:
         if temporario and os.path.exists(temporario):
             os.unlink(temporario)
@@ -847,9 +868,15 @@ def buscar_docs(consulta: str) -> str:
     if not termos:
         return "ERRO: consulta muito curta"
     achados = []
+    pasta_undo = os.path.realpath(os.path.join(config.DADOS, "undo"))
     for arq in glob.glob(os.path.join(config.DADOS, "**", "*"), recursive=True):
         if not os.path.isfile(arq):
             continue
+        try:
+            if os.path.commonpath((pasta_undo, os.path.realpath(arq))) == pasta_undo:
+                continue
+        except ValueError:
+            pass
         if os.path.splitext(arq)[1].lower() not in (".txt", ".md", ".csv", ".json", ""):
             continue
         try:
@@ -1053,6 +1080,8 @@ REGISTRO = {
     "memoria_resumir": memoria_resumir,
     "memoria_limpar": memoria_limpar,
     "buscar_docs": buscar_docs,
+    "listar_undo": undo.listar_undo,
+    "desfazer_ultima": undo.desfazer_ultima,
 }
 
 
