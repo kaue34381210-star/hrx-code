@@ -400,8 +400,10 @@ def rodar(motor_chamar, pol: permissao.Politica, historico: list, pergunta: str)
         saldo = config.CONTEXTO_MAX_CHARS - len(system_msg["content"])
         mensagens = [system_msg] + _janela(historico, saldo)
         with console.status("[cyan]pensando...", spinner="dots"):
-            texto = motor_chamar(mensagens)
-        historico.append({"role": "assistant", "content": texto})
+            texto = motor_chamar(mensagens) or ""
+        bloqueado = texto.lstrip().startswith("[sem resposta — bloqueado:")
+        if texto.strip() and not bloqueado:
+            historico.append({"role": "assistant", "content": texto})
         acao = extrair_json(texto)
         if acao is None:
             return texto

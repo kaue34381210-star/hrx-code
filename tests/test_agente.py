@@ -62,3 +62,21 @@ def test_acrescentar_chave_forca_permissao_600(tmp_path, preexistente):
     esperado = "anterior\nnova\n" if preexistente else "nova\n"
     assert caminho.read_text(encoding="utf-8") == esperado
     assert stat.S_IMODE(caminho.stat().st_mode) == 0o600
+
+
+@pytest.mark.parametrize(
+    "resposta",
+    ["", "   ", "[sem resposta — bloqueado: SAFETY]"],
+)
+def test_rodar_nao_guarda_resposta_vazia_ou_bloqueada(resposta):
+    historico = []
+
+    resultado = agente.rodar(
+        lambda _mensagens: resposta,
+        permissao.Politica(),
+        historico,
+        "pergunta",
+    )
+
+    assert resultado == resposta
+    assert historico == [{"role": "user", "content": "pergunta"}]
