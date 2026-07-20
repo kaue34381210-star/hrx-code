@@ -63,6 +63,24 @@ def test_escrita_interna_pode_rodar_no_modo_auto(projeto):
     assert "modo auto" in motivo
 
 
+@pytest.mark.parametrize(
+    "comando",
+    [
+        "git log --output=/tmp/saida",
+        "git -c core.pager=!sh log",
+        "git diff --ext-diff",
+    ],
+)
+def test_git_com_flag_sensivel_nao_e_rebaixado_no_modo_auto(projeto, comando):
+    pol = permissao.Politica(modo="auto")
+    pol.liberar_sempre(comando)
+
+    nivel, motivo = pol.classificar(comando)
+
+    assert nivel == "vermelho"
+    assert motivo == "git com flag sensível (grava/executa arbitrário)"
+
+
 def test_caminho_vazio_e_alto_risco(projeto):
     pol = permissao.Politica()
     args = {"caminho": ""}

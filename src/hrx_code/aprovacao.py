@@ -209,7 +209,7 @@ def classificar(comando: str, seguros_extra=()) -> tuple:
 
     if exe == "git":
         if GIT_FLAGS_SENSIVEIS.search(normalizado):
-            return ("amarelo", "git com flag sensível")
+            return ("vermelho", "git com flag sensível (grava/executa arbitrário)")
         sub = (tokens[1].lower() if len(tokens) > 1 else "")
         if sub in {"status", "diff", "log", "show", "branch", "remote",
                    "fetch", "rev-parse", "describe", "blame", "ls-files",
