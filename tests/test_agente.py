@@ -44,10 +44,24 @@ def test_rodar_desconta_system_do_orcamento_de_contexto(monkeypatch):
     assert sum(len(m["content"]) for m in mensagens) <= 40
 
 
-def test_janela_vazia_quando_system_consumiu_todo_orcamento():
+def test_janela_preserva_ultimo_turno_quando_system_consumiu_orcamento():
     historico = [{"role": "user", "content": "pergunta"}]
 
-    assert agente._janela(historico, orcamento=0) == []
+    assert agente._janela(historico, orcamento=0) == historico
+
+
+def test_rodar_envia_pergunta_quando_system_estoura_orcamento(monkeypatch):
+    monkeypatch.setattr(config, "CONTEXTO_MAX_CHARS", 10)
+    monkeypatch.setattr(agente, "_montar_system", lambda consulta="": "s" * 20)
+    recebidas = []
+
+    def motor(mensagens):
+        recebidas.append(mensagens)
+        return "resposta final"
+
+    agente.rodar(motor, permissao.Politica(), [], "pergunta atual")
+
+    assert [m["content"] for m in recebidas[0]] == ["s" * 20, "pergunta atual"]
 
 
 @pytest.mark.parametrize("preexistente", [False, True])

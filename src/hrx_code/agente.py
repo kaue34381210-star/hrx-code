@@ -311,8 +311,6 @@ def _janela(historico: list, orcamento: int = None) -> list:
     if orcamento is None:
         orcamento = config.CONTEXTO_MAX_CHARS
     orcamento = max(0, orcamento)
-    if orcamento == 0:
-        return []
     total, mantidos = 0, []
     for m in reversed(historico):
         total += len(m.get("content", ""))
