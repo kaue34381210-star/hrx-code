@@ -213,11 +213,11 @@ def extrair_json(texto: str):
                     pass
     inicio = t.find("{")
     if inicio != -1:
-        for fim in range(len(t), inicio, -1):
-            try:
-                return json.loads(t[inicio:fim])
-            except json.JSONDecodeError:
-                continue
+        try:
+            obj, _ = json.JSONDecoder().raw_decode(t, inicio)
+            return obj
+        except json.JSONDecodeError:
+            pass
     return None
 
 
